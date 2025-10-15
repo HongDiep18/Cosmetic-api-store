@@ -8,7 +8,7 @@ from pydantic import Field
 
 
 class Product(Document):
-    ProductID: str = Field(default_factory=lambda: str(uuid.uuid4()), alias="_id")
+    ProductID: str  # = Field(default_factory=lambda: str(uuid.uuid4()), alias="_id")
     ProductName: Indexed(str)  # type: ignore[valid-type]
     Description: str
     Price: float = Field(ge=0)
