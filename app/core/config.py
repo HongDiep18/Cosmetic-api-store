@@ -12,7 +12,7 @@ class Settings(BaseSettings):
 
     # Defaults optimized for Docker compose; override via .env in local/dev as needed
     # MONGODB_URI: str = "mongodb://mongodb:27017/cosmetic_shop_db"
-    MONGODB_URI: str = "mongodb://localhost:27017/cosmetic_shop_db"
+    MONGODB_URI: str
     MONGODB_DB: str = "cosmetic_shop_db"
 
     HOST: str = "0.0.0.0"
