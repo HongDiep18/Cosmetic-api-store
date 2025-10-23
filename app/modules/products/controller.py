@@ -30,7 +30,7 @@ async def list_products(
 
     total = await query.count()
     items = (
-        await query.sort("CreatedAt").skip((page - 1) * limit).limit(limit).to_list()
+        await query.sort("-createdAt").skip((page - 1) * limit).limit(limit).to_list()
     )
     return items, total
 
