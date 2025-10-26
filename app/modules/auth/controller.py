@@ -34,9 +34,8 @@ def create_login_token(account: Account, role_name: str) -> str:
     """Tạo access token JWT"""
     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     payload = {
-        "sub": str(account.Email),
+        "sub": str(account.id),
         "role": role_name,
-        "account_id": str(account.AccountID),
         "exp": expire,
     }
     token = jwt.encode(payload, settings.SECRET_KEY, algorithm=ALGORITHM)
@@ -58,7 +57,8 @@ async def authenticate_user(Email: str, Password: str) -> Tuple[Account, User]:
     if not verify_password(Password, account.PasswordHash):
         raise HTTPException(status_code=401, detail="Invalid password")
 
-    user = await User.find_one({"AccountID": str(account.AccountID)})
+    # 🔧 Dùng account.id (Mongo _id) chứ không phải account.AccountID
+    user = await User.find_one({"AccountID": account.id})
     if not user:
         raise HTTPException(status_code=404, detail="User profile not found")
 
@@ -85,7 +85,7 @@ async def register_user(Email: str, Password: str, FullName: str, Phone: str, Ad
         default_role = Role(RoleName="User")
         await default_role.insert()
 
-    # Tạo Account
+    # 🧾 Tạo Account
     account = Account(
         Email=email,
         PasswordHash=get_password_hash(Password),
@@ -94,17 +94,30 @@ async def register_user(Email: str, Password: str, FullName: str, Phone: str, Ad
     )
     await account.insert()
 
-    # Tạo User profile
+    print(f"🧾 Account created: {account.model_dump()}")
+
+    # 🧾 Tạo User (dùng account.id thật)
     user = User(
-        AccountID=str(account.id),
+        AccountID=account.id,
         FullName=FullName,
         Phone=Phone,
         Address=Address,
     )
     await user.insert()
 
-    print(f"✅ Registered successfully: {email}")
-    return {"AccountID": str(account.id), "UserID": str(user.id), "Email": email}
+    user_dict = {
+        "AccountID": str(account.id),
+        "UserID": str(user.id),
+        "Email": email,
+        "FullName": FullName,
+        "Phone": Phone,
+        "Address": Address,
+        "CreatedAt": user.CreatedAt,
+        "UpdatedAt": user.UpdatedAt,
+    }
+
+    print(f"🧾 User dict trả về: {user_dict}")
+    return user_dict
 
 
 # ==============================
@@ -128,7 +141,6 @@ async def forgot_password(email: str):
     email = email.strip().lower()
     account = await Account.find_one({"Email": email})
     if not account:
-        # Không tiết lộ thông tin — vẫn trả về OK
         return "If this email exists, a reset link has been sent."
 
     reset_token = secrets.token_urlsafe(32)
@@ -136,7 +148,6 @@ async def forgot_password(email: str):
     account.PasswordResetExpires = datetime.utcnow() + timedelta(hours=1)
     await account.save()
 
-    # (Tuỳ chọn) Gửi email — ở đây chỉ log ra
     print(f"🔗 Password reset token for {email}: {reset_token}")
     return "Password reset link sent to your email."
 

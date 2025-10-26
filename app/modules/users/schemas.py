@@ -2,10 +2,10 @@ from __future__ import annotations
 from typing import Optional
 from datetime import datetime
 from pydantic import BaseModel, Field, field_validator
-
+from beanie import Document, PydanticObjectId
 
 class UserBase(BaseModel):
-    AccountID: str
+    AccountID: Optional[PydanticObjectId]
     FullName: str = Field(default="")
     Phone: Optional[str] = None
     Address: Optional[str] = None
@@ -22,7 +22,7 @@ class UserUpdate(BaseModel):
 
 
 class UserOut(UserBase):
-    UserID: str
+    UserID:  Optional[PydanticObjectId]
     CreatedAt: datetime
     UpdatedAt: datetime
 

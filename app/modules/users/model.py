@@ -3,13 +3,14 @@ from typing import Optional
 from datetime import datetime
 import uuid
 from bson import ObjectId
-from beanie import Document
 from pydantic import Field
+from beanie import Document, PydanticObjectId
+
 
 
 class User(Document):
-    UserID: Optional[ObjectId] = Field(default_factory=ObjectId, alias="_id")
-    AccountID: str
+    UserID: Optional[PydanticObjectId] = Field(default_factory=PydanticObjectId, alias="_id")
+    AccountID: Optional[PydanticObjectId]
     FullName: str = Field(default="")
     Phone: Optional[str] = None
     Address: Optional[str] = None
@@ -18,10 +19,15 @@ class User(Document):
 
     class Settings:
         name = "users"
-        
+
     class Config:
         arbitrary_types_allowed = True
+        json_encoders = {
+            ObjectId: str,
+            PydanticObjectId: str,
+        }
 
     async def save(self, *args, **kwargs):  # type: ignore[override]
+        # Cập nhật UpdatedAt trước khi lưu tài liệu
         self.UpdatedAt = datetime.utcnow()
         return await super().save(*args, **kwargs)

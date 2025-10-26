@@ -2,14 +2,15 @@ from __future__ import annotations
 from typing import Literal
 from datetime import datetime
 import uuid
-
+from beanie import Document, PydanticObjectId
 from beanie import Document
 from pydantic import Field
-
+from typing import Optional
+from bson import ObjectId
 
 class Order(Document):
-    OrderID: str = Field(default_factory=lambda: str(uuid.uuid4()), alias="_id")
-    UserID: str
+    OrderID: Optional[PydanticObjectId] = Field(default_factory=PydanticObjectId, alias="_id")
+    UserID: Optional[PydanticObjectId] 
     ShippingAddress: str
     OrderDate: datetime = Field(default_factory=datetime.utcnow)
     TotalAmount: float = Field(ge=0)
@@ -21,6 +22,13 @@ class Order(Document):
 
     class Settings:
         name = "orders"
+
+    class Config:
+            arbitrary_types_allowed = True
+            json_encoders = {
+                ObjectId: str,  # Chuyển ObjectId thành string khi serialize thành JSON
+                PydanticObjectId: str,  # Đảm bảo PydanticObjectId cũng được chuyển thành string
+            }
 
     async def save(self, *args, **kwargs):  # type: ignore[override]
         self.UpdatedAt = datetime.utcnow()
