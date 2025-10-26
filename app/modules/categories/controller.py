@@ -12,7 +12,7 @@ async def list_categories(page: int = 1, limit: int = 50) -> Tuple[List[Category
     query = Category.find_all()
     total = await query.count()
     items = (
-        await query.sort("-createdAt").skip((page - 1) * limit).limit(limit).to_list()
+        await query.sort("CreatedAt").skip((page - 1) * limit).limit(limit).to_list()
     )
     return items, total
 
@@ -49,6 +49,6 @@ async def delete_category(category_id: str) -> bool:
 async def list_products_by_category(categoryId: str) -> List[Product]:
     return (
         await Product.find(Product.categoryId == categoryId)
-        .sort("-createdAt")
+        .sort("CreatedAt")
         .to_list()
     )
