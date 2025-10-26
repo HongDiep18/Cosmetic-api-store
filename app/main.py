@@ -1,5 +1,7 @@
+from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.db.init import init_db
@@ -10,6 +12,7 @@ from app.modules.orders.routes import router as orders_router
 from app.modules.categories.routes import router as categories_router
 from app.modules.reviews.routes import router as reviews_router
 from app.modules.shippers.routes import router as shippers_router
+from app.modules.uploads.routes import router as uploads_router
 
 
 def create_app() -> FastAPI:
@@ -23,6 +26,11 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # Mount static files for images
+    static_path = Path(__file__).parent.parent / "static"
+    static_path.mkdir(parents=True, exist_ok=True)
+    app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
 
     @app.on_event("startup")
     async def on_startup() -> None:  # noqa: D401
@@ -40,6 +48,7 @@ def create_app() -> FastAPI:
         reviews_router, prefix="/api/v1", tags=["reviews"]
     )  # includes /products/{id}/reviews and /reviews/{id}
     app.include_router(shippers_router, tags=["shippers"])
+    app.include_router(uploads_router, prefix="/api/v1/uploads", tags=["uploads"])
 
     @app.get("/", tags=["health"])
     async def root():
