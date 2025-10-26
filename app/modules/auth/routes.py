@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+
 from app.core.deps import get_current_account, require_admin_account
 from app.modules.auth.schemas import (
     ForgotPasswordRequest,
@@ -26,81 +27,73 @@ from app.modules.users.schemas import UserOut
 from app.modules.auth.model import Account, Role
 from app.modules.users.model import User
 
-router = APIRouter(tags=["Auth"])
+router = APIRouter(prefix="/api/v1")
 
-# ------------------- PUBLIC ROUTES -------------------
 
-@router.post("/register", response_model=UserOut)
+# Public routes
+@router.post("/auth/register", response_model=UserOut)
 async def register(data: RegisterRequest):
-    print("📩 Dữ liệu nhận được:", data.model_dump())
-
-    # Gọi controller tạo tài khoản + user
     user = await register_user(
-        Email=data.Email,
-        Password=data.Password,
-        FullName=data.FullName,
-        Phone=data.Phone,
-        Address=data.Address,
+        Email=data.email,
+        Password=data.password,
+        FullName=data.fullName,
+        Phone=data.phone,
+        Address=data.address,
     )
-
-    # ⚙️ FIX LỖI: Beanie Document cần convert sang dict trước khi đưa vào Pydantic
-    user_dict = user.to_dict() if hasattr(user, "to_dict") else user.dict()
-    return UserOut.model_validate(user_dict)
+    return UserOut.model_validate(user, from_attributes=True)
 
 
-@router.post("/login", response_model=Token)
+@router.post("/auth/login", response_model=Token)
 async def login_for_access_token(payload: LoginRequest):
-    print("📩 Raw payload:", payload)
-
-    account, user = await authenticate_user(payload.Email, payload.Password)
-    if not account:
-        raise HTTPException(status_code=404, detail="Account not found")
-
+    account, user = await authenticate_user(payload.email, payload.password)
     role = await Role.get(account.RoleID)
     role_name = role.RoleName if role else "User"
+    access_token = await create_login_token(account, role_name)
+    # NOTE: refresh token flow not fully implemented; return None for now
+    return Token(access_token=access_token, refresh_token=None)
 
-    access_token = create_login_token(account, role_name)
-    # access_token = await create_login_token(account, role_name)
-    return Token(AccessToken=access_token, RefreshToken=None)
 
-
-@router.post("/forgot-password")
+@router.post("/auth/forgot-password")
 async def forgot_password_endpoint(data: ForgotPasswordRequest):
+    """
+    Request password reset. Always returns success message for security.
+    """
     message = await forgot_password(data.email)
     return {"message": message}
 
 
-@router.post("/reset-password")
+@router.post("/auth/reset-password")
 async def reset_password_endpoint(data: ResetPasswordRequest):
+    """
+    Reset password using token from email.
+    """
     message = await reset_password(data.token, data.newPassword)
     return {"message": message}
 
 
-@router.post("/refresh-token", response_model=Token)
+@router.post("/auth/refresh-token", response_model=Token)
 async def refresh_token(_: RefreshTokenRequest):
+    # TODO: implement refresh token store/rotation; no-op for now
     raise HTTPException(
         status_code=status.HTTP_501_NOT_IMPLEMENTED,
         detail="Refresh token not implemented",
     )
 
-# ------------------- AUTH ROUTES -------------------
 
-@router.get("/me", response_model=UserOut)
+# Authenticated routes
+@router.get("/auth/me", response_model=UserOut)
 async def read_me(current_account: Account = Depends(get_current_account)):
     user = await User.find_one(User.AccountID == str(current_account.AccountID))
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    user_dict = user.to_dict() if hasattr(user, "to_dict") else user.dict()
-    return UserOut.model_validate(user_dict)
+    return UserOut.model_validate(user, from_attributes=True)  # type: ignore[arg-type]
 
 
-@router.post("/logout")
+@router.post("/auth/logout")
 async def logout():
+    # TODO: invalidate refresh token; no-op
     return {"message": "Logged out"}
 
 
-@router.patch("/change-password")
+@router.patch("/auth/change-password")
 async def change_password_endpoint(
     payload: ChangePasswordRequest,
     current_account: Account = Depends(get_current_account),
@@ -108,75 +101,116 @@ async def change_password_endpoint(
     await change_password(current_account, payload.currentPassword, payload.newPassword)
     return {"message": "Password updated"}
 
-# ------------------- ADMIN ROUTES -------------------
 
-@router.post("/roles", response_model=RoleOut, dependencies=[Depends(require_admin_account)])
+# Admin - Roles
+@router.post(
+    "/roles", response_model=RoleOut, dependencies=[Depends(require_admin_account)]
+)
 async def create_role(payload: RoleCreate):
     role = Role(RoleName=payload.RoleName)
     await role.insert()
-    return RoleOut.model_validate(role.to_dict())
+    return RoleOut.model_validate(role, from_attributes=True)
 
 
-@router.get("/roles", response_model=list[RoleOut], dependencies=[Depends(require_admin_account)])
+@router.get(
+    "/roles",
+    response_model=list[RoleOut],
+    dependencies=[Depends(require_admin_account)],
+)
 async def list_roles():
     roles = await Role.find_all().to_list()
-    return [RoleOut.model_validate(r.to_dict()) for r in roles]
+    return [RoleOut.model_validate(r, from_attributes=True) for r in roles]
 
 
-@router.put("/roles/{role_id}", response_model=RoleOut, dependencies=[Depends(require_admin_account)])
+@router.put(
+    "/roles/{role_id}",
+    response_model=RoleOut,
+    dependencies=[Depends(require_admin_account)],
+)
 async def update_role(role_id: str, payload: RoleCreate):
     role = await Role.get(role_id)
     if not role:
-        raise HTTPException(status_code=404, detail="Role not found")
-
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Role not found"
+        )
     role.RoleName = payload.RoleName
     await role.save()
-    return RoleOut.model_validate(role.to_dict())
+    return RoleOut.model_validate(role, from_attributes=True)
 
 
-@router.delete("/roles/{role_id}", status_code=204, dependencies=[Depends(require_admin_account)])
+@router.delete(
+    "/roles/{role_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_admin_account)],
+)
 async def delete_role(role_id: str):
     role = await Role.get(role_id)
     if not role:
-        raise HTTPException(status_code=404, detail="Role not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Role not found"
+        )
     await role.delete()
+    return None
 
 
-@router.get("/accounts", response_model=list[AccountOut], dependencies=[Depends(require_admin_account)])
+# Admin - Accounts
+@router.get(
+    "/accounts",
+    response_model=list[AccountOut],
+    dependencies=[Depends(require_admin_account)],
+)
 async def list_accounts():
     accounts = await Account.find_all().to_list()
-    return [AccountOut.model_validate(a.to_dict()) for a in accounts]
+    return [AccountOut.model_validate(a, from_attributes=True) for a in accounts]
 
 
-@router.get("/accounts/{account_id}", response_model=AccountOut, dependencies=[Depends(require_admin_account)])
+@router.get(
+    "/accounts/{account_id}",
+    response_model=AccountOut,
+    dependencies=[Depends(require_admin_account)],
+)
 async def get_account_detail(account_id: str):
     account = await Account.get(account_id)
     if not account:
-        raise HTTPException(status_code=404, detail="Account not found")
-    return AccountOut.model_validate(account.to_dict())
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Account not found"
+        )
+    return AccountOut.model_validate(account, from_attributes=True)
 
 
-@router.patch("/accounts/{account_id}/status", response_model=AccountOut, dependencies=[Depends(require_admin_account)])
+@router.patch(
+    "/accounts/{account_id}/status",
+    response_model=AccountOut,
+    dependencies=[Depends(require_admin_account)],
+)
 async def update_account_status(account_id: str, payload: dict):
     status_value = payload.get("status")
     if not status_value:
-        raise HTTPException(status_code=400, detail="status is required")
-
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="status is required"
+        )
     account = await set_account_status(account_id, status_value)
     if not account:
-        raise HTTPException(status_code=404, detail="Account not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Account not found"
+        )
+    return AccountOut.model_validate(account, from_attributes=True)
 
-    return AccountOut.model_validate(account.to_dict())
 
-
-@router.patch("/accounts/{account_id}/role", response_model=AccountOut, dependencies=[Depends(require_admin_account)])
+@router.patch(
+    "/accounts/{account_id}/role",
+    response_model=AccountOut,
+    dependencies=[Depends(require_admin_account)],
+)
 async def update_account_role(account_id: str, payload: dict):
-    role_id = payload.get("RoleId")
+    role_id = payload.get("RoleId") or payload.get("RoleId")
     if not role_id:
-        raise HTTPException(status_code=400, detail="RoleId is required")
-
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="RoleId is required"
+        )
     account = await set_account_role(account_id, role_id)
     if not account:
-        raise HTTPException(status_code=404, detail="Account not found")
-
-    return AccountOut.model_validate(account.to_dict())
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Account not found"
+        )
+    return AccountOut.model_validate(account, from_attributes=True)
