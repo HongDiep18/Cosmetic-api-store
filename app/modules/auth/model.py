@@ -2,43 +2,33 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 import uuid
-from beanie import Document, Indexed, PydanticObjectId
+
+from beanie import Document, Indexed
 from pydantic import EmailStr, Field
-from bson import ObjectId
-from typing import Annotated
-from beanie import Indexed
-from pydantic import EmailStr
+
 
 class Role(Document):
-    RoleID: Optional[ObjectId] = Field( alias="_id")
-    RoleName: str
+    RoleID: str = Field(default_factory=lambda: str(uuid.uuid4()), alias="_id")
+    RoleName: Indexed(str, unique=True)  # type: ignore[valid-type]
     CreatedAt: datetime = Field(default_factory=datetime.utcnow)
     UpdatedAt: datetime = Field(default_factory=datetime.utcnow)
 
     class Settings:
         name = "roles"
 
-    # ✅ Cho phép ObjectId và custom encoder để Pydantic không lỗi
-    model_config = {
-        "arbitrary_types_allowed": True,
-        "json_encoders": {
-            ObjectId: str,
-            PydanticObjectId: str,
-        },
-    }
-
-    async def save(self, *args, **kwargs):
+    async def save(self, *args, **kwargs):  # type: ignore[override]
         self.UpdatedAt = datetime.utcnow()
         return await super().save(*args, **kwargs)
 
 
 class Account(Document):
-    AccountID: Optional[PydanticObjectId] = Field(alias="_id")
-    Email: Annotated[EmailStr, Indexed(unique=True)]
-    PasswordHash: str
+    AccountID: str = Field(default_factory=lambda: str(uuid.uuid4()), alias="_id")
+    Email: Indexed(EmailStr, unique=True)  # type: ignore[valid-type]
+    PasswordHash: str = Field(min_length=1)
     RoleID: str
     Status: str = "Active"
 
+    # Password reset fields
     PasswordResetToken: Optional[str] = None
     PasswordResetExpires: Optional[datetime] = None
 
@@ -48,14 +38,6 @@ class Account(Document):
     class Settings:
         name = "accounts"
 
-    model_config = {
-        "arbitrary_types_allowed": True,
-        "json_encoders": {
-            ObjectId: str,
-            PydanticObjectId: str,
-        },
-    }
-
-    async def save(self, *args, **kwargs):
+    async def save(self, *args, **kwargs):  # type: ignore[override]
         self.UpdatedAt = datetime.utcnow()
         return await super().save(*args, **kwargs)

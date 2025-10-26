@@ -1,178 +1,168 @@
-from datetime import datetime, timedelta
-from typing import Optional, Tuple
 from fastapi import HTTPException, status
-from jose import jwt, JWTError
-from passlib.context import CryptContext
+from datetime import datetime, timedelta
 import secrets
 
-from app.core.config import settings
+from app.core.security import create_access_token, verify_password, get_passwordHash
+from app.core.email import email_service
 from app.modules.auth.model import Account, Role
 from app.modules.users.model import User
-
-# ==============================
-# 🔐 Cấu hình mật khẩu & JWT
-# ==============================
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 1 ngày
-ALGORITHM = "HS256"
-
-
-# ==============================
-# 🔒 Utilities
-# ==============================
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Xác minh mật khẩu người dùng"""
-    return pwd_context.verify(plain_password, hashed_password)
+from app.modules.auth.constants import (
+    ACCOUNT_NOT_FOUND,
+    EMAIL_ALREADY_USED,
+    INVALID_CREDENTIALS,
+    RESET_EMAIL_SENT,
+    INVALID_RESET_TOKEN,
+    RESET_SUCCESS,
+)
 
 
-def get_password_hash(password: str) -> str:
-    """Hash mật khẩu trước khi lưu"""
-    return pwd_context.hash(password)
+async def register_user(
+    Email: str,
+    Password: str,
+    FullName: str = "",
+    Phone: str | None = None,
+    Address: str | None = None,
+) -> User:
+    existing_account = await Account.find_one(Account.Email == Email)
+    if existing_account:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=EMAIL_ALREADY_USED
+        )
 
+    # Ensure default role exists (User)
+    role = await Role.find_one(Role.RoleName == "User")
+    if not role:
+        role = Role(RoleName="User")
+        await role.insert()
 
-def create_login_token(account: Account, role_name: str) -> str:
-    """Tạo access token JWT"""
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    payload = {
-        "sub": str(account.Email),
-        "role": role_name,
-        "account_id": str(account.AccountID),
-        "exp": expire,
-    }
-    token = jwt.encode(payload, settings.SECRET_KEY, algorithm=ALGORITHM)
-    return token
-
-
-# ==============================
-# 👤 AUTHENTICATION
-# ==============================
-async def authenticate_user(Email: str, Password: str) -> Tuple[Account, User]:
-    """Đăng nhập người dùng bằng email + password"""
-    email = Email.strip().lower()
-    print(f"📧 [AUTH] Finding account with email: {email}")
-
-    account = await Account.find_one({"Email": email})
-    if not account:
-        raise HTTPException(status_code=404, detail="Account not found")
-
-    if not verify_password(Password, account.PasswordHash):
-        raise HTTPException(status_code=401, detail="Invalid password")
-
-    user = await User.find_one({"AccountID": str(account.AccountID)})
-    if not user:
-        raise HTTPException(status_code=404, detail="User profile not found")
-
-    print(f"✅ Authenticated user: {user.FullName}")
-    return account, user
-
-
-# ==============================
-# 🧾 REGISTER
-# ==============================
-async def register_user(Email: str, Password: str, FullName: str, Phone: str, Address: str):
-    """Đăng ký tài khoản mới"""
-    email = Email.strip().lower()
-    print(f"📩 Register new user: {email}")
-
-    # Kiểm tra email trùng
-    existing = await Account.find_one({"Email": email})
-    if existing:
-        raise HTTPException(status_code=400, detail="Email already registered")
-
-    # Lấy role mặc định
-    default_role = await Role.find_one({"RoleName": "User"})
-    if not default_role:
-        default_role = Role(RoleName="User")
-        await default_role.insert()
-
-    # Tạo Account
     account = Account(
-        Email=email,
-        PasswordHash=get_password_hash(Password),
-        RoleID=str(default_role.id),
+        Email=Email,
+        PasswordHash=get_passwordHash(Password),
+        RoleID=str(role.RoleID),
         Status="Active",
     )
     await account.insert()
 
-    # Tạo User profile
     user = User(
-        AccountID=str(account.id),
+        AccountID=str(account.AccountID),
         FullName=FullName,
         Phone=Phone,
         Address=Address,
     )
     await user.insert()
-
-    print(f"✅ Registered successfully: {email}")
-    return {"AccountID": str(account.id), "UserID": str(user.id), "Email": email}
+    return user
 
 
-# ==============================
-# 🔁 CHANGE PASSWORD
-# ==============================
-async def change_password(account: Account, current_password: str, new_password: str):
-    """Đổi mật khẩu người dùng"""
-    if not verify_password(current_password, account.PasswordHash):
-        raise HTTPException(status_code=400, detail="Current password incorrect")
-
-    account.PasswordHash = get_password_hash(new_password)
-    await account.save()
-    return {"message": "Password updated successfully"}
-
-
-# ==============================
-# 🔑 FORGOT PASSWORD
-# ==============================
-async def forgot_password(email: str):
-    """Yêu cầu đặt lại mật khẩu"""
-    email = email.strip().lower()
-    account = await Account.find_one({"Email": email})
+async def authenticate_user(email: str, password: str) -> tuple[Account, User]:
+    account = await Account.find_one(Account.Email == email)
     if not account:
-        # Không tiết lộ thông tin — vẫn trả về OK
-        return "If this email exists, a reset link has been sent."
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail=INVALID_CREDENTIALS
+        )
+    if not verify_password(password, account.PasswordHash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail=INVALID_CREDENTIALS
+        )
+    user = await User.find_one(User.AccountID == str(account.AccountID))
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=ACCOUNT_NOT_FOUND
+        )
+    return account, user
 
-    reset_token = secrets.token_urlsafe(32)
-    account.PasswordResetToken = reset_token
-    account.PasswordResetExpires = datetime.utcnow() + timedelta(hours=1)
+
+async def create_login_token(account: Account, role_name: str) -> str:
+    return create_access_token(
+        subject=str(account.AccountID), extra_claims={"role": role_name}
+    )
+
+
+async def change_password(
+    account: Account, CurrentPassword: str, NewPassword: str
+) -> None:
+    if not verify_password(CurrentPassword, account.PasswordHash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Current password invalid"
+        )
+    account.PasswordHash = get_passwordHash(NewPassword)
     await account.save()
 
-    # (Tuỳ chọn) Gửi email — ở đây chỉ log ra
-    print(f"🔗 Password reset token for {email}: {reset_token}")
-    return "Password reset link sent to your email."
+
+async def set_account_status(account_id: str, StatusValue: str) -> Account | None:
+    account = await Account.get(account_id)
+    if not account:
+        return None
+    account.Status = StatusValue
+    await account.save()
+    return account
 
 
-# ==============================
-# 🔁 RESET PASSWORD
-# ==============================
-async def reset_password(token: str, new_password: str):
-    """Đặt lại mật khẩu bằng token"""
-    account = await Account.find_one({"PasswordResetToken": token})
-    if not account or not account.PasswordResetExpires or account.PasswordResetExpires < datetime.utcnow():
-        raise HTTPException(status_code=400, detail="Invalid or expired token")
+async def set_account_role(account_id: str, RoleId: str) -> Account | None:
+    account = await Account.get(account_id)
+    if not account:
+        return None
+    role = await Role.get(RoleId)
+    if not role:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Role not found"
+        )
+    account.RoleID = RoleId
+    await account.save()
+    return account
 
-    account.PasswordHash = get_password_hash(new_password)
+
+async def forgot_password(Email: str) -> str:
+    """
+    Generate password reset token and send email.
+    Always returns success message for security (prevents user enumeration).
+    """
+    account = await Account.find_one(Account.Email == Email)
+
+    if account:
+        # Generate secure random token
+        ResetToken = secrets.token_urlsafe(32)
+        hashed_token = get_passwordHash(ResetToken)
+
+        # Set expiration time (10 minutes from now)
+        ExpiresAt = datetime.utcnow() + timedelta(minutes=10)
+
+        # Update account with reset token and expiration
+        account.PasswordResetToken = hashed_token
+        account.PasswordResetExpires = ExpiresAt
+        await account.save()
+
+        # Send password reset email
+        await email_service.send_password_reset_email(Email, ResetToken)
+
+    # Always return success message (security best practice)
+    return RESET_EMAIL_SENT
+
+
+async def reset_password(Token: str, NewPassword: str) -> str:
+    """
+    Reset password using the provided token.
+    """
+    # Hash the token to compare with stored hash
+    hashed_token = get_passwordHash(Token)
+
+    # Find account with valid token and not expired
+    account = await Account.find_one(
+        Account.PasswordResetToken == hashed_token,
+        Account.PasswordResetExpires > datetime.utcnow(),
+    )
+
+    if not account:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=INVALID_RESET_TOKEN
+        )
+
+    # Update password
+    account.PasswordHash = get_passwordHash(NewPassword)
+
+    # Clear reset token (one-time use)
     account.PasswordResetToken = None
     account.PasswordResetExpires = None
+
     await account.save()
-    return "Password reset successful."
 
-
-# ==============================
-# ⚙️ ADMIN - CẬP NHẬT ROLE / STATUS
-# ==============================
-async def set_account_status(account_id: str, status_value: str):
-    account = await Account.get(account_id)
-    if not account:
-        return None
-    account.Status = status_value
-    await account.save()
-    return account
-
-
-async def set_account_role(account_id: str, role_id: str):
-    account = await Account.get(account_id)
-    if not account:
-        return None
-    account.RoleID = role_id
-    await account.save()
-    return account
+    return RESET_SUCCESS

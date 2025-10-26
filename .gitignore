@@ -1,4 +1,7 @@
-.venv
+venv/
+.venv/
+app/modules/uploads/
+.env.docker
 __pycache__/
 *.pyc
 *.pyo
@@ -18,3 +21,7 @@ fb_state.json
 supervisord.log
 apps/supervisord.log
 *.log
+
+# Uploaded files
+static/images/products/*
+!static/images/products/.gitkeep

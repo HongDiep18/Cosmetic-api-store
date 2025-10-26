@@ -2,9 +2,6 @@ from __future__ import annotations
 from datetime import datetime
 from pydantic import BaseModel, EmailStr, Field
 
-# =========================================
-# 🪪 TOKEN SCHEMAS
-# =========================================
 
 class Token(BaseModel):
     AccessToken: str
@@ -16,62 +13,39 @@ class TokenPayload(BaseModel):
     Sub: str | None = None
 
 
-# =========================================
-# 👤 AUTH REQUEST SCHEMAS
-# =========================================
-
 class RegisterRequest(BaseModel):
-    Email: EmailStr = Field(..., alias="Email")
-    Password: str = Field(..., min_length=6, alias="Password")
-    FullName: str = Field(..., alias="FullName")
-    Phone: str | None = Field(default=None, alias="Phone")
-    Address: str | None = Field(default=None, alias="Address")
-
-    model_config = {
-        "populate_by_name": True,
-        "extra": "ignore",
-    }
+    email: EmailStr
+    password: str = Field(min_length=6)
+    fullName: str = Field(default="")
+    phone: str | None = None
+    address: str | None = None
 
 
 class LoginRequest(BaseModel):
-    Email: EmailStr = Field(..., alias="Email")
-    Password: str = Field(..., alias="Password")
-
-    model_config = {
-        "populate_by_name": True,
-        "extra": "ignore",
-    }
+    email: EmailStr
+    password: str
 
 
 class ForgotPasswordRequest(BaseModel):
-    Email: EmailStr = Field(..., alias="Email")
+    email: EmailStr
 
 
 class ResetPasswordRequest(BaseModel):
-    Token: str = Field(..., alias="Token")
-    NewPassword: str = Field(..., min_length=6, alias="NewPassword")
+    token: str
+    newPassword: str = Field(min_length=6)
 
 
 class RefreshTokenRequest(BaseModel):
-    RefreshToken: str = Field(..., alias="RefreshToken")
+    RefreshToken: str
 
 
 class ChangePasswordRequest(BaseModel):
-    CurrentPassword: str = Field(..., alias="CurrentPassword")
-    NewPassword: str = Field(..., min_length=6, alias="NewPassword")
+    currentPassword: str
+    newPassword: str = Field(min_length=6)
 
-
-# =========================================
-# 👑 ROLE & ACCOUNT OUTPUT SCHEMAS
-# =========================================
 
 class RoleCreate(BaseModel):
-    RoleName: str = Field(..., min_length=1, alias="RoleName")
-
-    model_config = {
-        "populate_by_name": True,
-        "extra": "ignore",
-    }
+    RoleName: str = Field(min_length=1)
 
 
 class RoleOut(BaseModel):
@@ -80,9 +54,8 @@ class RoleOut(BaseModel):
     CreatedAt: datetime
     UpdatedAt: datetime
 
-    model_config = {
-        "from_attributes": True,
-    }
+    class Config:
+        from_attributes = True
 
 
 class AccountOut(BaseModel):
@@ -93,6 +66,5 @@ class AccountOut(BaseModel):
     CreatedAt: datetime
     UpdatedAt: datetime
 
-    model_config = {
-        "from_attributes": True,
-    }
+    class Config:
+        from_attributes = True
