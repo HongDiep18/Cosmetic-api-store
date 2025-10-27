@@ -1,7 +1,10 @@
 from fastapi import HTTPException, status
 from datetime import datetime, timedelta
+from typing import Tuple
 import secrets
+from jose import jwt
 
+from app.core.config import settings
 from app.core.security import create_access_token, verify_password, get_passwordHash
 from app.core.email import email_service
 from app.modules.auth.model import Account, Role
@@ -34,38 +37,6 @@ async def register_user(
     if not role:
         role = Role(RoleName="User")
         await role.insert()
-
-# ==============================
-# 🔐 Cấu hình mật khẩu & JWT
-# ==============================
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 1 ngày
-ALGORITHM = "HS256"
-
-
-# ==============================
-# 🔒 Utilities
-# ==============================
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Xác minh mật khẩu người dùng"""
-    return pwd_context.verify(plain_password, hashed_password)
-
-
-def get_password_hash(password: str) -> str:
-    """Hash mật khẩu trước khi lưu"""
-    return pwd_context.hash(password)
-
-
-def create_login_token(account: Account, role_name: str) -> str:
-    """Tạo access token JWT"""
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    payload = {
-        "sub": str(account.id),
-        "role": role_name,
-        "exp": expire,
-    }
-    token = jwt.encode(payload, settings.SECRET_KEY, algorithm=ALGORITHM)
-    return token
 
 
 # ==============================
@@ -154,7 +125,7 @@ async def change_password(account: Account, current_password: str, new_password:
     if not verify_password(current_password, account.PasswordHash):
         raise HTTPException(status_code=400, detail="Current password incorrect")
 
-    account.PasswordHash = get_password_hash(new_password)
+    account.PasswordHash = get_passwordHash(new_password)
     await account.save()
     return {"message": "Password updated successfully"}
 
