@@ -35,6 +35,83 @@ async def register_user(
         role = Role(RoleName="User")
         await role.insert()
 
+# ==============================
+# 🔐 Cấu hình mật khẩu & JWT
+# ==============================
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 1 ngày
+ALGORITHM = "HS256"
+
+
+# ==============================
+# 🔒 Utilities
+# ==============================
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Xác minh mật khẩu người dùng"""
+    return pwd_context.verify(plain_password, hashed_password)
+
+
+def get_password_hash(password: str) -> str:
+    """Hash mật khẩu trước khi lưu"""
+    return pwd_context.hash(password)
+
+
+def create_login_token(account: Account, role_name: str) -> str:
+    """Tạo access token JWT"""
+    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    payload = {
+        "sub": str(account.id),
+        "role": role_name,
+        "exp": expire,
+    }
+    token = jwt.encode(payload, settings.SECRET_KEY, algorithm=ALGORITHM)
+    return token
+
+
+# ==============================
+# 👤 AUTHENTICATION
+# ==============================
+async def authenticate_user(Email: str, Password: str) -> Tuple[Account, User]:
+    """Đăng nhập người dùng bằng email + password"""
+    email = Email.strip().lower()
+    print(f"📧 [AUTH] Finding account with email: {email}")
+
+    account = await Account.find_one({"Email": email})
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    if not verify_password(Password, account.PasswordHash):
+        raise HTTPException(status_code=401, detail="Invalid password")
+
+    # 🔧 Dùng account.id (Mongo _id) chứ không phải account.AccountID
+    user = await User.find_one({"AccountID": account.id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User profile not found")
+
+    print(f"✅ Authenticated user: {user.FullName}")
+    return account, user
+
+
+# ==============================
+# 🧾 REGISTER
+# ==============================
+async def register_user(Email: str, Password: str, FullName: str, Phone: str, Address: str):
+    """Đăng ký tài khoản mới"""
+    email = Email.strip().lower()
+    print(f"📩 Register new user: {email}")
+
+    # Kiểm tra email trùng
+    existing = await Account.find_one({"Email": email})
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    # Lấy role mặc định
+    default_role = await Role.find_one({"RoleName": "User"})
+    if not default_role:
+        default_role = Role(RoleName="User")
+        await default_role.insert()
+
+    # 🧾 Tạo Account
     account = Account(
         Email=Email,
         PasswordHash=get_passwordHash(Password),
@@ -43,33 +120,57 @@ async def register_user(
     )
     await account.insert()
 
+    print(f"🧾 Account created: {account.model_dump()}")
+
+    # 🧾 Tạo User (dùng account.id thật)
     user = User(
-        AccountID=str(account.AccountID),
+        AccountID=account.id,
         FullName=FullName,
         Phone=Phone,
         Address=Address,
     )
     await user.insert()
-    return user
+
+    user_dict = {
+        "AccountID": str(account.id),
+        "UserID": str(user.id),
+        "Email": email,
+        "FullName": FullName,
+        "Phone": Phone,
+        "Address": Address,
+        "CreatedAt": user.CreatedAt,
+        "UpdatedAt": user.UpdatedAt,
+    }
+
+    print(f"🧾 User dict trả về: {user_dict}")
+    return user_dict
+
+
+# ==============================
+# 🔁 CHANGE PASSWORD
+# ==============================
+async def change_password(account: Account, current_password: str, new_password: str):
+    """Đổi mật khẩu người dùng"""
+    if not verify_password(current_password, account.PasswordHash):
+        raise HTTPException(status_code=400, detail="Current password incorrect")
+
+    account.PasswordHash = get_password_hash(new_password)
+    await account.save()
+    return {"message": "Password updated successfully"}
 
 
 async def authenticate_user(email: str, password: str) -> tuple[Account, User]:
     account = await Account.find_one(Account.Email == email)
     if not account:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail=INVALID_CREDENTIALS
-        )
-    if not verify_password(password, account.PasswordHash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail=INVALID_CREDENTIALS
-        )
-    user = await User.find_one(User.AccountID == str(account.AccountID))
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=ACCOUNT_NOT_FOUND
-        )
-    return account, user
+        return "If this email exists, a reset link has been sent."
 
+    reset_token = secrets.token_urlsafe(32)
+    account.PasswordResetToken = reset_token
+    account.PasswordResetExpires = datetime.utcnow() + timedelta(hours=1)
+    await account.save()
+
+    print(f"🔗 Password reset token for {email}: {reset_token}")
+    return "Password reset link sent to your email."
 
 async def create_login_token(account: Account, role_name: str) -> str:
     return create_access_token(

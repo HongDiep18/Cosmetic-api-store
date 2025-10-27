@@ -3,7 +3,7 @@ from typing import Optional
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
-
+from beanie import PydanticObjectId
 from app.core.config import settings
 from app.modules.auth.model import Account, Role
 
@@ -21,16 +21,22 @@ async def get_current_account(token: str = Depends(oauth2_scheme)) -> Account:
         payload = jwt.decode(
             token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
         )
+        
         account_id: Optional[str] = payload.get("sub")
         if account_id is None:
             raise credentials_exception
-    except JWTError:
-        raise credentials_exception
+        
+        
+        account = await Account.get(PydanticObjectId(account_id))
 
-    account = await Account.get(account_id)
-    if account is None:
+        if not account:
+            raise credentials_exception
+
+        return account
+
+    except (JWTError, Exception) as e:
+        print("❌ Token decode/get_current_account error:", e)
         raise credentials_exception
-    return account
 
 
 async def require_admin_account(

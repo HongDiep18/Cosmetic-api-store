@@ -2,42 +2,51 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 import uuid
-
-from beanie import Document, Indexed
+from beanie import Document, PydanticObjectId
 from pydantic import EmailStr, Field
-
+from bson import ObjectId
 
 class Role(Document):
-    RoleID: str = Field(default_factory=lambda: str(uuid.uuid4()), alias="_id")
-    RoleName: Indexed(str, unique=True)  # type: ignore[valid-type]
+    RoleID: Optional[PydanticObjectId] = Field(default_factory=PydanticObjectId, alias="_id")
+    RoleName: str
     CreatedAt: datetime = Field(default_factory=datetime.utcnow)
     UpdatedAt: datetime = Field(default_factory=datetime.utcnow)
 
     class Settings:
         name = "roles"
 
-    async def save(self, *args, **kwargs):  # type: ignore[override]
+    class Config:
+        arbitrary_types_allowed = True
+        json_encoders = {
+            ObjectId: str,  # Chuyển ObjectId thành string khi serialize thành JSON
+            PydanticObjectId: str,  # Đảm bảo PydanticObjectId cũng được chuyển thành string
+        }
+
+    async def save(self, *args, **kwargs):
         self.UpdatedAt = datetime.utcnow()
         return await super().save(*args, **kwargs)
 
-
 class Account(Document):
-    AccountID: str = Field(default_factory=lambda: str(uuid.uuid4()), alias="_id")
-    Email: Indexed(EmailStr, unique=True)  # type: ignore[valid-type]
-    PasswordHash: str = Field(min_length=1)
-    RoleID: str
-    Status: str = "Active"
-
-    # Password reset fields
+    AccountID: Optional[PydanticObjectId] = Field(default_factory=PydanticObjectId, alias="_id")
+    Email: EmailStr = Field(..., unique=True)
+    PasswordHash: str
+    RoleID: Optional[PydanticObjectId]  
+    Status: str = Field(default="Active")
     PasswordResetToken: Optional[str] = None
     PasswordResetExpires: Optional[datetime] = None
-
     CreatedAt: datetime = Field(default_factory=datetime.utcnow)
     UpdatedAt: datetime = Field(default_factory=datetime.utcnow)
 
     class Settings:
         name = "accounts"
 
-    async def save(self, *args, **kwargs):  # type: ignore[override]
-        self.UpdatedAt = datetime.utcnow()
+    class Config:
+        arbitrary_types_allowed = True
+        json_encoders = {
+            ObjectId: str,  # Chuyển ObjectId thành string khi serialize thành JSON
+            PydanticObjectId: str,  # Đảm bảo PydanticObjectId cũng được chuyển thành string
+        }
+
+    async def save(self, *args, **kwargs):  # Override phương thức save của Beanie
+        self.UpdatedAt = datetime.utcnow()  # Cập nhật thời gian sửa đổi
         return await super().save(*args, **kwargs)

@@ -8,7 +8,7 @@ if defined _OLD_CODEPAGE (
     "%SystemRoot%\System32\chcp.com" 65001 > nul
 )
 
-set VIRTUAL_ENV=E:\Subject\No_SQL\Web_NoSQL\react-cosmetic-api\venv
+set VIRTUAL_ENV=C:\Users\Khang\Desktop\loadAccount\Cosmetic-api-store-main\venv
 
 if not defined PROMPT set PROMPT=$P$G
 
