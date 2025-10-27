@@ -1,7 +1,4 @@
-venv/
-.venv/
-app/modules/uploads/
-.env.docker
+.venv
 __pycache__/
 *.pyc
 *.pyo
@@ -22,6 +19,8 @@ supervisord.log
 apps/supervisord.log
 *.log
 
+
+app/modules/uploads/
 # Uploaded files
 static/images/products/*
 !static/images/products/.gitkeep
