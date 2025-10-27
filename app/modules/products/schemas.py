@@ -12,6 +12,13 @@ class ProductBase(BaseModel):
     Status: str = "Available"
     Image: Optional[str] = None
     CategoryID: str
+    CategoryName: Optional[str] = None
+    Brand: Optional[str] = None
+    Rating: Optional[float] = Field(default=0.0, ge=0, le=5)
+    ReviewCount: Optional[int] = Field(default=0, ge=0)
+    IsFeatured: Optional[bool] = False
+    IsNew: Optional[bool] = False
+    OriginalPrice: Optional[float] = None
 
 
 class ProductCreate(ProductBase):
@@ -26,6 +33,13 @@ class ProductUpdate(BaseModel):
     Status: Optional[str] = None
     Image: Optional[str] = None
     CategoryID: Optional[str] = None
+    CategoryName: Optional[str] = None
+    Brand: Optional[str] = None
+    Rating: Optional[float] = Field(default=None, ge=0, le=5)
+    ReviewCount: Optional[int] = Field(default=None, ge=0)
+    IsFeatured: Optional[bool] = None
+    IsNew: Optional[bool] = None
+    OriginalPrice: Optional[float] = None
 
 
 class ProductOut(ProductBase):
