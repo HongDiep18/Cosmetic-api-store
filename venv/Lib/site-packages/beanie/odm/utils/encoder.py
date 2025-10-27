@@ -24,7 +24,11 @@ import pydantic
 
 import beanie
 from beanie.odm.fields import Link, LinkTypes
-from beanie.odm.utils.pydantic import IS_PYDANTIC_V2, get_model_fields
+from beanie.odm.utils.pydantic import (
+    IS_PYDANTIC_V2,
+    IS_PYDANTIC_V2_10,
+    get_model_fields,
+)
 
 SingleArgCallable = Callable[[Any], Any]
 DEFAULT_CUSTOM_ENCODERS: MutableMapping[type, SingleArgCallable] = {
@@ -51,6 +55,11 @@ if IS_PYDANTIC_V2:
 
     DEFAULT_CUSTOM_ENCODERS[Url] = str
 
+if IS_PYDANTIC_V2_10:
+    from pydantic import AnyUrl
+
+    DEFAULT_CUSTOM_ENCODERS[AnyUrl] = str
+
 BSON_SCALAR_TYPES = (
     type(None),
     str,
@@ -63,6 +72,7 @@ BSON_SCALAR_TYPES = (
     bson.MaxKey,
     bson.MinKey,
     bson.ObjectId,
+    bson.Regex,
 )
 
 

@@ -1,4 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import JSONResponse
+import traceback
+
+from pydantic import ValidationError
+
 from app.core.deps import get_current_account, require_admin_account
 from app.modules.auth.schemas import (
     ForgotPasswordRequest,
@@ -25,27 +30,51 @@ from app.modules.auth.controller import (
 from app.modules.users.schemas import UserOut
 from app.modules.auth.model import Account, Role
 from app.modules.users.model import User
-
+from bson import ObjectId
 router = APIRouter(tags=["Auth"])
 
 # ------------------- PUBLIC ROUTES -------------------
-
 @router.post("/register", response_model=UserOut)
 async def register(data: RegisterRequest):
     print("📩 Dữ liệu nhận được:", data.model_dump())
 
-    # Gọi controller tạo tài khoản + user
-    user = await register_user(
-        Email=data.Email,
-        Password=data.Password,
-        FullName=data.FullName,
-        Phone=data.Phone,
-        Address=data.Address,
-    )
+    try:
+        # Gọi controller tạo tài khoản + user
+        user = await register_user(
+            Email=data.Email,
+            Password=data.Password,
+            FullName=data.FullName,
+            Phone=data.Phone,
+            Address=data.Address,
+        )
 
-    # ⚙️ FIX LỖI: Beanie Document cần convert sang dict trước khi đưa vào Pydantic
-    user_dict = user.to_dict() if hasattr(user, "to_dict") else user.dict()
-    return UserOut.model_validate(user_dict)
+        # Convert user sang dict
+        if hasattr(user, "to_dict"):
+            user_dict = user.to_dict()
+        elif hasattr(user, "model_dump"):
+            user_dict = user.model_dump()
+        elif isinstance(user, dict):
+            user_dict = user
+        else:
+            raise TypeError(f"❌ Không biết cách convert kiểu {type(user)} sang dict")
+
+        print("🧾 User dict trả về:", user_dict)
+
+        # Validate output schema
+        validated_user = UserOut.model_validate(user_dict)
+        return validated_user
+
+    except Exception as e:
+        print("❌ ValidationError chi tiết:")
+        traceback.print_exc()
+        return JSONResponse(
+            status_code=400,
+            content={
+                "error": "Response model validation failed",
+                "details": str(e),
+            },
+        )
+
 
 
 @router.post("/login", response_model=Token)
@@ -53,6 +82,7 @@ async def login_for_access_token(payload: LoginRequest):
     print("📩 Raw payload:", payload)
 
     account, user = await authenticate_user(payload.Email, payload.Password)
+
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
 
@@ -60,7 +90,6 @@ async def login_for_access_token(payload: LoginRequest):
     role_name = role.RoleName if role else "User"
 
     access_token = create_login_token(account, role_name)
-    # access_token = await create_login_token(account, role_name)
     return Token(AccessToken=access_token, RefreshToken=None)
 
 
@@ -87,10 +116,14 @@ async def refresh_token(_: RefreshTokenRequest):
 
 @router.get("/me", response_model=UserOut)
 async def read_me(current_account: Account = Depends(get_current_account)):
-    user = await User.find_one(User.AccountID == str(current_account.AccountID))
+    print("🔐 Current account ID:", current_account.id)
+
+    user = await User.find_one(User.AccountID == ObjectId(current_account.id))
     if not user:
+        print("❌ Không tìm thấy user với AccountID:", current_account.id)
         raise HTTPException(status_code=404, detail="User not found")
 
+    print("✅ Tìm thấy user:", user.FullName)
     user_dict = user.to_dict() if hasattr(user, "to_dict") else user.dict()
     return UserOut.model_validate(user_dict)
 
