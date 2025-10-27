@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field, field_validator
 
 class CategoryBase(BaseModel):
     CategoryName: str = Field(min_length=1)
+    Description: Optional[str] = None
 
 
 class CategoryCreate(CategoryBase):
@@ -14,6 +15,7 @@ class CategoryCreate(CategoryBase):
 
 class CategoryUpdate(BaseModel):
     CategoryName: Optional[str] = Field(default=None, min_length=1)
+    Description: Optional[str] = None
 
 
 class CategoryOut(CategoryBase):
