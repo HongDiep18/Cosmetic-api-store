@@ -31,6 +31,14 @@ origins = [
     "http://127.0.0.1",
 ]
 
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=origins,          # ✅ Cho phép frontend
+#     allow_credentials=True,
+#     allow_methods=["*"],            # ✅ Cho tất cả phương thức (POST, GET, ...)
+#     allow_headers=["*"],            # ✅ Cho tất cả headers (Authorization, Content-Type,...)
+# )
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,  # ✅ Cho phép frontend
@@ -38,7 +46,6 @@ app.add_middleware(
     allow_methods=["*"],  # ✅ Cho tất cả phương thức (POST, GET, ...)
     allow_headers=["*"],  # ✅ Cho tất cả headers (Authorization, Content-Type,...)
 )
-
 
 # ✅ Gắn các router (API modules)
 app.include_router(auth_router, prefix="/api/auth", tags=["Auth"])

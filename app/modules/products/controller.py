@@ -62,3 +62,11 @@ async def delete_product(product_id: str) -> bool:
         return False
     await product.delete()
     return True
+
+#get số lượng sản phẩm sắp hết (Stock <= 5)
+async def get_low_stock_products_count(threshold: int = 5) -> int:
+    """
+    Trả về số lượng sản phẩm có stock <= threshold.
+    """
+    low_stock_count = await Product.find_many(Product.Stock <= threshold).count()
+    return low_stock_count
