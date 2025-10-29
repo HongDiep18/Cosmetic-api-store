@@ -1,25 +1,14 @@
 from __future__ import annotations
 from datetime import datetime
-import uuid
-
-from beanie import Document
+from beanie import Document, PydanticObjectId
 from pydantic import Field
 from bson import ObjectId
-from pydantic import Field
-from beanie import Document, PydanticObjectId
-
-# Tạo PydanticObjectId (nếu chưa có)
-from bson import ObjectId
-from pydantic import BaseModel
-from beanie import Document, PydanticObjectId
-from typing import Optional
 
 
 class Shipper(Document):
-    ShipperID: Optional[PydanticObjectId] = Field(default_factory=PydanticObjectId, alias="_id")
-    AccountID: Optional[PydanticObjectId]  
-    FullName: str
-    Phone: str
+    id: PydanticObjectId = Field(default_factory=PydanticObjectId, alias="_id")
+    fullName: str
+    phone: str
     CreatedAt: datetime = Field(default_factory=datetime.utcnow)
     UpdatedAt: datetime = Field(default_factory=datetime.utcnow)
 
@@ -32,7 +21,6 @@ class Shipper(Document):
             ObjectId: str,
             PydanticObjectId: str,
         }
-
 
     async def save(self, *args, **kwargs):  # type: ignore[override]
         self.UpdatedAt = datetime.utcnow()  # Cập nhật UpdatedAt mỗi khi lưu tài liệu

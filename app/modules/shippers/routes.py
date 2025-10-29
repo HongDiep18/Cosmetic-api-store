@@ -10,30 +10,33 @@ from app.modules.shippers.controller import (
     delete_shipper,
 )
 
-router = APIRouter(prefix="/api/v1")
+router = APIRouter()
 
 
-# Admin routes
-@router.post(
-    "/shippers", response_model=ShipperOut, status_code=status.HTTP_201_CREATED
-)
+# create shipper
+@router.post("/", response_model=ShipperOut, status_code=status.HTTP_201_CREATED)
 async def create_shipper_endpoint(
     data: ShipperCreate,
-    _: str = Depends(require_admin_account),
+    # _: str = Depends(require_admin_account),
 ):
     shipper = await create_shipper(data)
     return ShipperOut.model_validate(shipper, from_attributes=True)
 
 
-@router.get("/shippers", response_model=list[ShipperOut])
-async def list_shippers_endpoint(
-    _: str = Depends(require_admin_account),
-):
-    shippers = await list_shippers()
-    return [ShipperOut.model_validate(s, from_attributes=True) for s in shippers]
+# get all shippers
+@router.get("/list-shippers", response_model=list[ShipperOut])
+async def list_shippers_endpoint():
+    try:
+        shippers = await list_shippers()
+        return [ShipperOut.model_validate(s, from_attributes=True) for s in shippers]
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error retrieving shippers: {str(e)}",
+        )
 
 
-@router.get("/shippers/{shipper_id}", response_model=ShipperOut)
+@router.get("/{shipper_id}", response_model=ShipperOut)
 async def get_shipper_endpoint(
     shipper_id: str,
     _: str = Depends(require_admin_account),
@@ -46,7 +49,7 @@ async def get_shipper_endpoint(
     return ShipperOut.model_validate(shipper, from_attributes=True)
 
 
-@router.patch("/shippers/{shipper_id}", response_model=ShipperOut)
+@router.patch("/{shipper_id}", response_model=ShipperOut)
 async def update_shipper_endpoint(
     shipper_id: str,
     data: ShipperUpdate,
@@ -60,7 +63,7 @@ async def update_shipper_endpoint(
     return ShipperOut.model_validate(shipper, from_attributes=True)
 
 
-@router.delete("/shippers/{shipper_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{shipper_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_shipper_endpoint(
     shipper_id: str,
     _: str = Depends(require_admin_account),

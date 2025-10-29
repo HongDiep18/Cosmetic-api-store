@@ -1,42 +1,61 @@
 from __future__ import annotations
 from typing import List, Optional
-
 from app.modules.orders.model import Order, OrderItem
 from app.modules.orders.schemas import OrderCreate
 
 
 async def create_order(user_id: str, data: OrderCreate) -> Order:
-    items: List[OrderItem] = [
-        OrderItem(
-            product_id=i.product_id,
-            quantity=i.quantity,
-            price_at_purchase=i.price_at_purchase,
+    try:
+        # Create items list
+        items: List[OrderItem] = []
+        for item in data.Items:
+            items.append(
+                OrderItem(
+                    ProductID=item.ProductID,  # Use string ID directly
+                    Quantity=item.Quantity,
+                    Price=item.Price,
+                )
+            )
+
+        # Calculate total amount
+        total_amount = sum(item.Price * item.Quantity for item in items)
+
+        # Create and save order
+        order = Order(
+            UserID=user_id,  # Use string ID directly
+            Items=items,
+            TotalAmount=total_amount,
+            ShippingAddress=data.ShippingAddress,
         )
-        for i in data.products
-    ]
-    total_amount = sum(i.quantity * i.price_at_purchase for i in items)
-    order = Order(
-        user_id=user_id,
-        products=items,
-        total_amount=total_amount,
-        shipping_address=data.shipping_address,
-    )
-    await order.insert()
-    return order
+        await order.insert()
+        return order
+    except Exception as e:
+        raise Exception(f"Error creating order: {str(e)}")
 
 
 async def get_user_orders(user_id: str) -> List[Order]:
-    return await Order.find(Order.user_id == user_id).sort("-created_at").to_list()
+    try:
+        # Find orders with exact user_id string match
+        orders = await Order.find({"UserID": user_id}).sort("-CreatedAt").to_list()
+
+        # Ensure each order's _id is converted to string
+        for order in orders:
+            if hasattr(order, "_id"):
+                order._id = str(order._id)
+
+        return orders
+    except Exception as e:
+        raise Exception(f"Error fetching user orders: {str(e)}")
 
 
 async def list_all_orders() -> List[Order]:
-    return await Order.find_all().sort("-created_at").to_list()
+    return await Order.find_all().sort("-CreatedAt").to_list()
 
 
 async def update_order_status(order_id: str, status: str) -> Optional[Order]:
     order = await Order.get(order_id)
     if not order:
         return None
-    order.status = status
+    order.Status = status
     await order.save()
     return order

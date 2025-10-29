@@ -1,13 +1,15 @@
 from __future__ import annotations
 from datetime import datetime
 from typing import Optional
-import uuid
 from beanie import Document, PydanticObjectId
 from pydantic import EmailStr, Field
 from bson import ObjectId
 
+
 class Role(Document):
-    RoleID: Optional[PydanticObjectId] = Field(default_factory=PydanticObjectId, alias="_id")
+    RoleID: Optional[PydanticObjectId] = Field(
+        default_factory=PydanticObjectId, alias="_id"
+    )
     RoleName: str
     CreatedAt: datetime = Field(default_factory=datetime.utcnow)
     UpdatedAt: datetime = Field(default_factory=datetime.utcnow)
@@ -26,11 +28,14 @@ class Role(Document):
         self.UpdatedAt = datetime.utcnow()
         return await super().save(*args, **kwargs)
 
+
 class Account(Document):
-    AccountID: Optional[PydanticObjectId] = Field(default_factory=PydanticObjectId, alias="_id")
+    AccountID: Optional[PydanticObjectId] = Field(
+        default_factory=PydanticObjectId, alias="_id"
+    )
     Email: EmailStr = Field(..., unique=True)
     PasswordHash: str
-    RoleID: Optional[PydanticObjectId]  
+    RoleID: Optional[PydanticObjectId]
     Status: str = Field(default="Active")
     PasswordResetToken: Optional[str] = None
     PasswordResetExpires: Optional[datetime] = None

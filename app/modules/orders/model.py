@@ -1,48 +1,55 @@
 from __future__ import annotations
-from typing import Literal
 from datetime import datetime
-import uuid
 from beanie import Document, PydanticObjectId
-from beanie import Document
-from pydantic import Field
-from typing import Optional
+from pydantic import BaseModel, Field
 from bson import ObjectId
+from enum import Enum
+
+
+class OrderStatus(str, Enum):
+    PENDING = "Pending"
+    PROCESSING = "Processing"
+    SHIPPED = "Shipped"
+    DELIVERED = "Delivered"
+    CANCELLED = "Cancelled"
+
+
+class OrderItem(BaseModel):
+    ProductID: str
+    Quantity: int = Field(ge=1)
+    Price: float = Field(ge=0)
+
 
 class Order(Document):
-    OrderID: Optional[PydanticObjectId] = Field(default_factory=PydanticObjectId, alias="_id")
-    UserID: Optional[PydanticObjectId] 
+    id: PydanticObjectId = Field(default_factory=PydanticObjectId, alias="_id")
+    UserID: str
     ShippingAddress: str
     OrderDate: datetime = Field(default_factory=datetime.utcnow)
     TotalAmount: float = Field(ge=0)
-    Status: Literal["Pending", "Processing", "Shipped", "Delivered", "Cancelled"] = (
-        "Pending"
-    )
+    Status: OrderStatus = OrderStatus.PENDING
+    Items: list[OrderItem] = []  # Array of embedded items
     CreatedAt: datetime = Field(default_factory=datetime.utcnow)
     UpdatedAt: datetime = Field(default_factory=datetime.utcnow)
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        # Ensure _id is always converted to string in the output
+        if hasattr(self, "_id"):
+            self._id = str(self._id)
 
     class Settings:
         name = "orders"
 
     class Config:
-            arbitrary_types_allowed = True
-            json_encoders = {
-                ObjectId: str,  # Chuyển ObjectId thành string khi serialize thành JSON
-                PydanticObjectId: str,  # Đảm bảo PydanticObjectId cũng được chuyển thành string
-            }
+        arbitrary_types_allowed = True
+        json_encoders = {
+            ObjectId: str,  # Chuyển ObjectId thành string khi serialize thành JSON
+            PydanticObjectId: str,  # Đảm bảo PydanticObjectId cũng được chuyển thành string
+        }
 
     async def save(self, *args, **kwargs):  # type: ignore[override]
         self.UpdatedAt = datetime.utcnow()
         return await super().save(*args, **kwargs)
 
 
-class OrderItem(Document):
-    OrderID: str
-    ProductID: str
-    Quantity: int = Field(ge=1)
-    Price: float = Field(ge=0)
-
-    class Settings:
-        name = "order_items"
-        indexes = [
-            [("OrderID", 1), ("ProductID", 1)],  # Compound primary key
-        ]
+# No need for a separate OrderItem document since it's embedded in Order

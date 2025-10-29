@@ -8,7 +8,7 @@ from app.core.config import settings
 from app.modules.auth.model import Account, Role
 
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 
 async def get_current_account(token: str = Depends(oauth2_scheme)) -> Account:
@@ -21,12 +21,11 @@ async def get_current_account(token: str = Depends(oauth2_scheme)) -> Account:
         payload = jwt.decode(
             token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
         )
-        
+
         account_id: Optional[str] = payload.get("sub")
         if account_id is None:
             raise credentials_exception
-        
-        
+
         account = await Account.get(PydanticObjectId(account_id))
 
         if not account:

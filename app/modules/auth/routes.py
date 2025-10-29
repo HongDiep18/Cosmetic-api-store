@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 import traceback
 
-from pydantic import ValidationError
 
 from app.core.deps import get_current_account, require_admin_account
 from app.modules.auth.schemas import (
@@ -20,7 +19,6 @@ from app.modules.auth.schemas import (
 from app.modules.auth.controller import (
     authenticate_user,
     change_password,
-    create_login_token,
     forgot_password,
     register_user,
     reset_password,
@@ -31,7 +29,9 @@ from app.modules.users.schemas import UserOut
 from app.modules.auth.model import Account, Role
 from app.modules.users.model import User
 from bson import ObjectId
+
 router = APIRouter(tags=["Auth"])
+
 
 # ------------------- PUBLIC ROUTES -------------------
 @router.post("/register", response_model=UserOut)
@@ -76,9 +76,14 @@ async def register(data: RegisterRequest):
         )
 
 
-
-@router.post("/login", response_model=Token)
+@router.post("/login")
 async def login_for_access_token(payload: LoginRequest):
+    """Login endpoint.
+
+    NOTE: token issuance is currently commented out per request — this endpoint
+    will authenticate the user but does not return an access token. If you need
+    the token later, uncomment the create_login_token call and the response.
+    """
     print("📩 Raw payload:", payload)
 
     account, user = await authenticate_user(payload.Email, payload.Password)
@@ -86,11 +91,12 @@ async def login_for_access_token(payload: LoginRequest):
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
 
-    role = await Role.get(account.RoleID)
-    role_name = role.RoleName if role else "User"
+    # role lookup removed because token issuance is commented out
 
-    access_token = create_login_token(account, role_name)
-    return Token(AccessToken=access_token, RefreshToken=None)
+    # access_token = await create_login_token(account, role_name)
+    # return Token(AccessToken=access_token, RefreshToken=None)
+
+    return {"message": "Login successful (token issuance commented out)"}
 
 
 @router.post("/forgot-password")
@@ -112,7 +118,9 @@ async def refresh_token(_: RefreshTokenRequest):
         detail="Refresh token not implemented",
     )
 
+
 # ------------------- AUTH ROUTES -------------------
+
 
 @router.get("/me", response_model=UserOut)
 async def read_me(current_account: Account = Depends(get_current_account)):
@@ -141,22 +149,34 @@ async def change_password_endpoint(
     await change_password(current_account, payload.currentPassword, payload.newPassword)
     return {"message": "Password updated"}
 
+
 # ------------------- ADMIN ROUTES -------------------
 
-@router.post("/roles", response_model=RoleOut, dependencies=[Depends(require_admin_account)])
+
+@router.post(
+    "/roles", response_model=RoleOut, dependencies=[Depends(require_admin_account)]
+)
 async def create_role(payload: RoleCreate):
     role = Role(RoleName=payload.RoleName)
     await role.insert()
     return RoleOut.model_validate(role.to_dict())
 
 
-@router.get("/roles", response_model=list[RoleOut], dependencies=[Depends(require_admin_account)])
+@router.get(
+    "/roles",
+    response_model=list[RoleOut],
+    dependencies=[Depends(require_admin_account)],
+)
 async def list_roles():
     roles = await Role.find_all().to_list()
     return [RoleOut.model_validate(r.to_dict()) for r in roles]
 
 
-@router.put("/roles/{role_id}", response_model=RoleOut, dependencies=[Depends(require_admin_account)])
+@router.put(
+    "/roles/{role_id}",
+    response_model=RoleOut,
+    dependencies=[Depends(require_admin_account)],
+)
 async def update_role(role_id: str, payload: RoleCreate):
     role = await Role.get(role_id)
     if not role:
@@ -167,7 +187,9 @@ async def update_role(role_id: str, payload: RoleCreate):
     return RoleOut.model_validate(role.to_dict())
 
 
-@router.delete("/roles/{role_id}", status_code=204, dependencies=[Depends(require_admin_account)])
+@router.delete(
+    "/roles/{role_id}", status_code=204, dependencies=[Depends(require_admin_account)]
+)
 async def delete_role(role_id: str):
     role = await Role.get(role_id)
     if not role:
@@ -175,13 +197,21 @@ async def delete_role(role_id: str):
     await role.delete()
 
 
-@router.get("/accounts", response_model=list[AccountOut], dependencies=[Depends(require_admin_account)])
+@router.get(
+    "/accounts",
+    response_model=list[AccountOut],
+    dependencies=[Depends(require_admin_account)],
+)
 async def list_accounts():
     accounts = await Account.find_all().to_list()
     return [AccountOut.model_validate(a.to_dict()) for a in accounts]
 
 
-@router.get("/accounts/{account_id}", response_model=AccountOut, dependencies=[Depends(require_admin_account)])
+@router.get(
+    "/accounts/{account_id}",
+    response_model=AccountOut,
+    dependencies=[Depends(require_admin_account)],
+)
 async def get_account_detail(account_id: str):
     account = await Account.get(account_id)
     if not account:
@@ -189,7 +219,11 @@ async def get_account_detail(account_id: str):
     return AccountOut.model_validate(account.to_dict())
 
 
-@router.patch("/accounts/{account_id}/status", response_model=AccountOut, dependencies=[Depends(require_admin_account)])
+@router.patch(
+    "/accounts/{account_id}/status",
+    response_model=AccountOut,
+    dependencies=[Depends(require_admin_account)],
+)
 async def update_account_status(account_id: str, payload: dict):
     status_value = payload.get("status")
     if not status_value:
@@ -202,7 +236,11 @@ async def update_account_status(account_id: str, payload: dict):
     return AccountOut.model_validate(account.to_dict())
 
 
-@router.patch("/accounts/{account_id}/role", response_model=AccountOut, dependencies=[Depends(require_admin_account)])
+@router.patch(
+    "/accounts/{account_id}/role",
+    response_model=AccountOut,
+    dependencies=[Depends(require_admin_account)],
+)
 async def update_account_role(account_id: str, payload: dict):
     role_id = payload.get("RoleId")
     if not role_id:
