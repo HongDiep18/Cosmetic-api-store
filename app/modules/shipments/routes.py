@@ -1,7 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.deps import get_current_account, require_admin_account
-from app.modules.shipments.schemas import ShipmentCreate, ShipmentUpdate, ShipmentOut
+from app.modules.shipments.schemas import (
+    ShipmentCreate,
+    ShipmentUpdate,
+    ShipmentOut,
+    ShipmentStatsOut,
+)
 from app.modules.shipments.controller import (
     create_shipment,
     get_shipment,
@@ -9,22 +14,67 @@ from app.modules.shipments.controller import (
     get_shipments_by_shipper,
     update_shipment,
     delete_shipment,
+    get_shipment_stats,
 )
 from app.modules.auth.model import Account
+from beanie import PydanticObjectId
 
-router = APIRouter(prefix="/api/v1")
+router = APIRouter()
 
 
-@router.post("/shipments", response_model=ShipmentOut)
+# get 4 status shipments
+@router.get("/stats", response_model=ShipmentStatsOut)
+async def get_shipment_stats_endpoint(
+    # current_account: Account = Depends(require_admin_account),
+):
+    stats = await get_shipment_stats()
+    return stats
+
+
+# create shipment
+@router.post("/", response_model=ShipmentOut)
 async def create_shipment_endpoint(
     shipment_data: ShipmentCreate,
-    current_account: Account = Depends(require_admin_account),
+    # current_account: Account = Depends(require_admin_account),
 ):
-    shipment = await create_shipment(shipment_data)
-    return ShipmentOut.model_validate(shipment, from_attributes=True)
+    try:
+        # Convert string IDs to PydanticObjectId before creating shipment
+        data = shipment_data.model_dump()
+
+        try:
+            data["OrderID"] = PydanticObjectId(data["OrderID"])
+        except (ValueError, TypeError):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid OrderID format. Must be a valid ObjectId",
+            )
+
+        try:
+            data["ShipperID"] = PydanticObjectId(data["ShipperID"])
+        except (ValueError, TypeError):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid ShipperID format. Must be a valid ObjectId",
+            )
+
+        shipment = await create_shipment(data)
+        if not shipment:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to create shipment",
+            )
+
+        return ShipmentOut.model_validate(shipment, from_attributes=True)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error creating shipment: {str(e)}",
+        )
 
 
-@router.get("/shipments/{shipment_id}", response_model=ShipmentOut)
+@router.get("/{shipment_id}", response_model=ShipmentOut)
 async def get_shipment_endpoint(
     shipment_id: str, current_account: Account = Depends(get_current_account)
 ):
@@ -52,7 +102,7 @@ async def get_shipper_shipments(
     return [ShipmentOut.model_validate(s, from_attributes=True) for s in shipments]
 
 
-@router.patch("/shipments/{shipment_id}", response_model=ShipmentOut)
+@router.patch("/{shipment_id}", response_model=ShipmentOut)
 async def update_shipment_endpoint(
     shipment_id: str,
     shipment_data: ShipmentUpdate,
@@ -66,7 +116,7 @@ async def update_shipment_endpoint(
     return ShipmentOut.model_validate(shipment, from_attributes=True)
 
 
-@router.delete("/shipments/{shipment_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{shipment_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_shipment_endpoint(
     shipment_id: str, current_account: Account = Depends(require_admin_account)
 ):

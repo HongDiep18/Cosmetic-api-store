@@ -11,7 +11,7 @@ from app.modules.payments.controller import (
 )
 from app.modules.auth.model import Account
 
-router = APIRouter(prefix="/api/v1")
+router = APIRouter(prefix="/api")
 
 
 @router.post("/payments", response_model=PaymentOut)

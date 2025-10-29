@@ -5,9 +5,8 @@ from pydantic import BaseModel, Field, field_validator
 
 
 class ShipperBase(BaseModel):
-    AccountID: str
-    FullName: str = Field(min_length=1)
-    Phone: str = Field(min_length=1)
+    fullName: str = Field(min_length=1)
+    phone: str = Field(min_length=1)
 
 
 class ShipperCreate(ShipperBase):
@@ -20,14 +19,15 @@ class ShipperUpdate(BaseModel):
 
 
 class ShipperOut(ShipperBase):
-    ShipperID: str
+    id: str = Field(alias="_id")
     CreatedAt: datetime
     UpdatedAt: datetime
 
     class Config:
         from_attributes = True
+        populate_by_name = True
 
-    @field_validator("ShipperID", mode="before")
+    @field_validator("id", mode="before")
     @classmethod
     def cast_id(cls, v):
-        return str(v)
+        return str(v) if v else None

@@ -1,14 +1,22 @@
 from __future__ import annotations
-from typing import Literal, Optional
+from typing import Optional
 from datetime import datetime
 from pydantic import BaseModel, Field, field_validator
+from enum import Enum
+
+
+class StatusPayment(Enum):
+    PENDING = "Pending"
+    PAID = "Paid"
+    FAILED = "Failed"
+    REFUNDED = "Refund"
 
 
 class PaymentBase(BaseModel):
     OrderID: str
     PaymentMethod: str
     Amount: float = Field(ge=0)
-    Status: Literal["Pending", "Paid", "Failed", "Refunded"] = "Pending"
+    Status: StatusPayment = StatusPayment.PENDING
     PaymentDate: Optional[datetime] = None
 
 
@@ -17,7 +25,7 @@ class PaymentCreate(PaymentBase):
 
 
 class PaymentUpdate(BaseModel):
-    Status: Optional[Literal["Pending", "Paid", "Failed", "Refunded"]] = None
+    Status: Optional[StatusPayment] = None
     PaymentDate: Optional[datetime] = None
 
 
