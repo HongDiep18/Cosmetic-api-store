@@ -53,8 +53,6 @@ async def delete_shipment(shipment_id: str) -> bool:
 async def get_shipment_stats() -> dict:
     total_shipments = await Shipment.all().count()
 
-    # Use Beanie's find(...) query method instead of non-existent filter(...) on the
-    # Document class. Compare against the enum values.
     preparing = await Shipment.find(
         Shipment.Status == ShipmentStatus.PREPARING.value
     ).count()
@@ -67,10 +65,47 @@ async def get_shipment_stats() -> dict:
         Shipment.Status == ShipmentStatus.DELIVERED.value
     ).count()
 
-    # Return keys matching the ShipmentStatsOut schema (PascalCase)
     return {
         "TotalShipments": total_shipments,
         "Preparing": preparing,
         "Delivering": delivering,
         "Delivered": delivered,
     }
+
+
+# Get all shipments with shipper details
+async def get_all_shipments_with_details():
+    try:
+        pipeline = [
+            {
+                "$lookup": {
+                    "from": "shippers",
+                    "localField": "ShipperID",
+                    "foreignField": "_id",
+                    "as": "shipper",
+                }
+            },
+            {"$unwind": {"path": "$shipper", "preserveNullAndEmptyArrays": True}},
+            {
+                "$project": {
+                    "ShipmentID": {"$toString": "$_id"},
+                    "TrackingNumber": 1,
+                    "OrderID": {"$toString": "$OrderID"},
+                    "EstimatedDeliveryDate": 1,
+                    "ActualDeliveryDate": 1,
+                    "Status": 1,
+                    "ShipperName": "$shipper.FullName",
+                    "_id": 0,
+                }
+            },
+        ]
+
+        raw_data = (
+            await Shipment.get_motor_collection()
+            .aggregate(pipeline)
+            .to_list(length=None)
+        )
+        return raw_data
+    except Exception as e:
+        print(f"Error in get_all_shipments_with_details: {str(e)}")
+        raise
