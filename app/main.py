@@ -12,7 +12,8 @@ from app.modules.orders.routes import router as orders_router
 from app.modules.categories.routes import router as categories_router
 from app.modules.reviews.routes import router as reviews_router
 from app.modules.shippers.routes import router as shippers_router
-from app.modules.admin_accountview.routes import router as admin_accountview_router
+
+# from app.modules.admin_accountview.routes import router as admin_accountview_router
 from app.modules.shipments.routes import router as shipments_router
 
 # ✅ Tạo app chính
@@ -57,7 +58,7 @@ app.include_router(orders_router, prefix="/api/orders", tags=["Orders"])
 app.include_router(categories_router, prefix="/api/categories", tags=["Categories"])
 app.include_router(reviews_router, prefix="/api/reviews", tags=["Reviews"])
 app.include_router(shippers_router, prefix="/api/shippers", tags=["Shippers"])
-app.include_router(admin_accountview_router, prefix="/api/admin", tags=["Admin"])
+# app.include_router(admin_accountview_router, prefix="/api/admin", tags=["Admin"])
 
 app.include_router(shipments_router, prefix="/api/shipments", tags=["shipments"])
 

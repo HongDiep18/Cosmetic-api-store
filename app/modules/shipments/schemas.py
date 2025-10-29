@@ -3,6 +3,7 @@ from typing import Optional
 from datetime import datetime
 from pydantic import BaseModel, field_validator
 from beanie import PydanticObjectId
+from bson import ObjectId
 from enum import Enum
 
 
@@ -67,3 +68,21 @@ class ShipmentStatsOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class ShipmentListResponse(BaseModel):
+    ShipmentID: str
+    TrackingNumber: Optional[str] = None
+    OrderID: str
+    EstimatedDeliveryDate: Optional[datetime] = None
+    ActualDeliveryDate: Optional[datetime] = None
+    Status: ShipmentStatus
+    ShipperName: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+        json_encoders = {
+            ObjectId: str,
+            PydanticObjectId: str,
+            datetime: lambda v: v.isoformat() if v else None,
+        }
