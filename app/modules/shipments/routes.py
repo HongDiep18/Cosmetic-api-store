@@ -6,6 +6,7 @@ from app.modules.shipments.schemas import (
     ShipmentUpdate,
     ShipmentOut,
     ShipmentStatsOut,
+    ShipmentListResponse,
 )
 from app.modules.shipments.controller import (
     create_shipment,
@@ -15,6 +16,7 @@ from app.modules.shipments.controller import (
     update_shipment,
     delete_shipment,
     get_shipment_stats,
+    get_all_shipments_with_details,
 )
 from app.modules.auth.model import Account
 from beanie import PydanticObjectId
@@ -71,6 +73,23 @@ async def create_shipment_endpoint(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error creating shipment: {str(e)}",
+        )
+
+
+# get list all shipments with details
+@router.get("/list-all", response_model=list[ShipmentListResponse])
+async def list_all_shipments(
+    # current_account: Account = Depends(require_admin_account),
+):
+    try:
+        shipments = await get_all_shipments_with_details()
+        if not shipments:
+            return []
+        return shipments
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching shipments: {str(e)}",
         )
 
 

@@ -12,7 +12,8 @@ from app.modules.orders.routes import router as orders_router
 from app.modules.categories.routes import router as categories_router
 from app.modules.reviews.routes import router as reviews_router
 from app.modules.shippers.routes import router as shippers_router
-from app.modules.admin_accountview.routes import router as admin_accountview_router
+
+# from app.modules.admin_accountview.routes import router as admin_accountview_router
 from app.modules.shipments.routes import router as shipments_router
 
 # ✅ Tạo app chính
@@ -31,6 +32,14 @@ origins = [
     "http://127.0.0.1",
 ]
 
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=origins,          # ✅ Cho phép frontend
+#     allow_credentials=True,
+#     allow_methods=["*"],            # ✅ Cho tất cả phương thức (POST, GET, ...)
+#     allow_headers=["*"],            # ✅ Cho tất cả headers (Authorization, Content-Type,...)
+# )
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,  # ✅ Cho phép frontend
@@ -38,7 +47,6 @@ app.add_middleware(
     allow_methods=["*"],  # ✅ Cho tất cả phương thức (POST, GET, ...)
     allow_headers=["*"],  # ✅ Cho tất cả headers (Authorization, Content-Type,...)
 )
-
 
 # ✅ Gắn các router (API modules)
 app.include_router(auth_router, prefix="/api/auth", tags=["Auth"])
@@ -50,6 +58,10 @@ app.include_router(orders_router, prefix="/api/orders", tags=["Orders"])
 app.include_router(categories_router, prefix="/api/categories", tags=["Categories"])
 app.include_router(reviews_router, prefix="/api/reviews", tags=["Reviews"])
 app.include_router(shippers_router, prefix="/api/shippers", tags=["Shippers"])
+
+
+app.include_router(admin_accountview_router, prefix="/api/admin", tags=["Admin"])
+
 app.include_router(shipments_router, prefix="/api/shipments", tags=["shipments"])
 app.include_router(admin_accountview_router, prefix="/api/admin", tags=["Admin"])
 

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.core.deps import require_admin_account
+from app.modules.products.model import Product
 from app.modules.products.schemas import ProductCreate, ProductOut, ProductUpdate
 from app.modules.products.controller import (
     create_product,
@@ -8,6 +9,8 @@ from app.modules.products.controller import (
     get_product,
     list_products,
     update_product,
+    get_low_stock_products_count
+   
 )
 
 router = APIRouter()
@@ -73,3 +76,10 @@ async def delete_product_endpoint(product_id: str):
             status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
         )
     return None
+
+
+#Get số lượng sản phẩm sắp hết (Stock <= 5)
+@router.get("/low-stock/count")
+async def low_stock_count_endpoint():
+    count = await get_low_stock_products_count()
+    return {"low_stock_count": count}
