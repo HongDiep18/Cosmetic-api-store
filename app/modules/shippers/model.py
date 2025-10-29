@@ -3,12 +3,13 @@ from datetime import datetime
 from beanie import Document, PydanticObjectId
 from pydantic import Field
 from bson import ObjectId
-
+from typing import Optional
 
 class Shipper(Document):
-    id: PydanticObjectId = Field(default_factory=PydanticObjectId, alias="_id")
-    fullName: str
-    phone: str
+    Shipper: Optional[PydanticObjectId] = Field(default_factory=PydanticObjectId, alias="_id")
+    AccountID: Optional[PydanticObjectId]
+    FullName: str
+    Phone: str
     CreatedAt: datetime = Field(default_factory=datetime.utcnow)
     UpdatedAt: datetime = Field(default_factory=datetime.utcnow)
 

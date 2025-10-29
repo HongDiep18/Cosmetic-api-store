@@ -50,9 +50,8 @@ app.include_router(orders_router, prefix="/api/orders", tags=["Orders"])
 app.include_router(categories_router, prefix="/api/categories", tags=["Categories"])
 app.include_router(reviews_router, prefix="/api/reviews", tags=["Reviews"])
 app.include_router(shippers_router, prefix="/api/shippers", tags=["Shippers"])
-app.include_router(admin_accountview_router, prefix="/api/admin", tags=["Admin"])
-
 app.include_router(shipments_router, prefix="/api/shipments", tags=["shipments"])
+app.include_router(admin_accountview_router, prefix="/api/admin", tags=["Admin"])
 
 
 # ✅ Khi app khởi động

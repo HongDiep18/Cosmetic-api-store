@@ -21,3 +21,21 @@ class ShipperOut(BaseModel):
     Status: str
     TotalDeliveries: Optional[int]
     CreatedAt: datetime
+
+
+class AccountOut(BaseModel):
+    AccountID: str # hoặc _id nếu dùng 
+    UserID: Optional[str]
+    ShipperID: Optional[str]
+    Email:str
+    RoleName: Optional[str]
+    RoleID: Optional[str]
+    FullName: str
+    PasswordHash: str
+    Phone: str
+    Status: str
+    Address:Optional[str]
+    TotalOrders: Optional[int]
+    TotalDeliveries: Optional[int]
+    CreatedAt: Optional[datetime]
+    UpdatedAt: Optional[datetime]
