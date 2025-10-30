@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field, field_validator
 
 
 class ShipperBase(BaseModel):
+    # Use the same attribute names as the Beanie Document (fullName, phone)
     fullName: str = Field(min_length=1)
     phone: str = Field(min_length=1)
 
@@ -14,8 +15,8 @@ class ShipperCreate(ShipperBase):
 
 
 class ShipperUpdate(BaseModel):
-    FullName: Optional[str] = None
-    Phone: Optional[str] = None
+    fullName: Optional[str] = None
+    phone: Optional[str] = None
 
 
 class ShipperOut(ShipperBase):

@@ -8,17 +8,18 @@ from enum import Enum
 
 
 class ShipmentStatus(str, Enum):
-    PREPARING = "Preparing"
-    IN_TRANSIT = "In Transit"
+    PENDING = "Pending"
+    PROCESSING = "Processing"
+    SHIPPED = "Shipped"
     DELIVERED = "Delivered"
-    FAILED = "Failed"
+    CANCELLED = "Cancelled"
 
 
 class ShipmentBase(BaseModel):
     OrderID: str  # Accept string in API but convert to PydanticObjectId in handler
     ShipperID: str  # Accept string in API but convert to PydanticObjectId in handler
     TrackingNumber: Optional[str] = None
-    Status: ShipmentStatus = ShipmentStatus.PREPARING
+    Status: ShipmentStatus = ShipmentStatus.PENDING
     ShipmentDate: Optional[datetime] = None
     EstimatedDeliveryDate: Optional[datetime] = None
     ActualDeliveryDate: Optional[datetime] = None
@@ -62,8 +63,9 @@ class ShipmentOut(ShipmentBase):
 
 class ShipmentStatsOut(BaseModel):
     TotalShipments: int
-    Preparing: int
-    Delivering: int
+    Pending: int
+    Processing: int
+    Shipped: int
     Delivered: int
 
     class Config:
@@ -73,7 +75,7 @@ class ShipmentStatsOut(BaseModel):
 class ShipmentListResponse(BaseModel):
     ShipmentID: str
     TrackingNumber: Optional[str] = None
-    OrderID: str
+    OrderID: Optional[str] = None
     EstimatedDeliveryDate: Optional[datetime] = None
     ActualDeliveryDate: Optional[datetime] = None
     Status: ShipmentStatus
