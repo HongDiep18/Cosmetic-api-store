@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
-from typing import Optional, Tuple
-from fastapi import HTTPException, status
-from jose import jwt, JWTError
+from typing import Tuple
+from fastapi import HTTPException
+from jose import jwt
 from passlib.context import CryptContext
 import secrets
 
@@ -62,14 +62,16 @@ async def authenticate_user(Email: str, Password: str) -> Tuple[Account, User]:
     if not user:
         raise HTTPException(status_code=404, detail="User profile not found")
 
-    print(f"✅ Authenticated user: {user.FullName}")
+    print(f" Authenticated user: {user.FullName}")
     return account, user
 
 
 # ==============================
 # 🧾 REGISTER
 # ==============================
-async def register_user(Email: str, Password: str, FullName: str, Phone: str, Address: str):
+async def register_user(
+    Email: str, Password: str, FullName: str, Phone: str, Address: str
+):
     """Đăng ký tài khoản mới"""
     email = Email.strip().lower()
     print(f"📩 Register new user: {email}")
@@ -158,7 +160,11 @@ async def forgot_password(email: str):
 async def reset_password(token: str, new_password: str):
     """Đặt lại mật khẩu bằng token"""
     account = await Account.find_one({"PasswordResetToken": token})
-    if not account or not account.PasswordResetExpires or account.PasswordResetExpires < datetime.utcnow():
+    if (
+        not account
+        or not account.PasswordResetExpires
+        or account.PasswordResetExpires < datetime.utcnow()
+    ):
         raise HTTPException(status_code=400, detail="Invalid or expired token")
 
     account.PasswordHash = get_password_hash(new_password)

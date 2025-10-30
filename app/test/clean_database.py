@@ -40,25 +40,25 @@ async def clean_and_recreate_database():
         # Xóa các collection cũ
         print("1. Xóa các collection cũ...")
         await database.users.drop()
-        print("   ✅ Đã xóa collection 'users'")
+        print("    Đã xóa collection 'users'")
 
         await database.accounts.drop()
-        print("   ✅ Đã xóa collection 'accounts'")
+        print("    Đã xóa collection 'accounts'")
 
         await database.roles.drop()
-        print("   ✅ Đã xóa collection 'roles'")
+        print("    Đã xóa collection 'roles'")
 
         # Tạo role mặc định
         print("\n2. Tạo role mặc định...")
         default_role = Role(RoleName="User")
         await default_role.insert()
-        print(f"   ✅ Đã tạo role 'User' với ID: {default_role.RoleID}")
+        print(f"    Đã tạo role 'User' với ID: {default_role.RoleID}")
 
         admin_role = Role(RoleName="Admin")
         await admin_role.insert()
-        print(f"   ✅ Đã tạo role 'Admin' với ID: {admin_role.RoleID}")
+        print(f"    Đã tạo role 'Admin' với ID: {admin_role.RoleID}")
 
-        print("\n3. ✅ HOÀN THÀNH!")
+        print("\n3.  HOÀN THÀNH!")
         print("   - Database đã được làm sạch")
         print("   - Cấu trúc mới đã được tạo")
         print("   - Bạn có thể đăng ký lại từ frontend")

@@ -7,8 +7,8 @@ from bson import ObjectId
 
 class Shipper(Document):
     id: PydanticObjectId = Field(default_factory=PydanticObjectId, alias="_id")
-    fullName: str
-    phone: str
+    fullName: str = Field(..., alias="FullName")
+    phone: str = Field(..., alias="Phone")
     CreatedAt: datetime = Field(default_factory=datetime.utcnow)
     UpdatedAt: datetime = Field(default_factory=datetime.utcnow)
 
@@ -21,6 +21,8 @@ class Shipper(Document):
             ObjectId: str,
             PydanticObjectId: str,
         }
+
+        populate_by_name = True
 
     async def save(self, *args, **kwargs):  # type: ignore[override]
         self.UpdatedAt = datetime.utcnow()  # Cập nhật UpdatedAt mỗi khi lưu tài liệu

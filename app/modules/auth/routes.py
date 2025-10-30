@@ -131,7 +131,7 @@ async def read_me(current_account: Account = Depends(get_current_account)):
         print("❌ Không tìm thấy user với AccountID:", current_account.id)
         raise HTTPException(status_code=404, detail="User not found")
 
-    print("✅ Tìm thấy user:", user.FullName)
+    print(" Tìm thấy user:", user.FullName)
     user_dict = user.to_dict() if hasattr(user, "to_dict") else user.dict()
     return UserOut.model_validate(user_dict)
 

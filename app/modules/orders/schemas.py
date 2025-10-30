@@ -10,11 +10,7 @@ class OrderStatus(str, Enum):
     PENDING = "Pending"
     PROCESSING = "Processing"
     SHIPPED = "Shipped"
-    DELIVERED = "Delivered"
     CANCELLED = "Cancelled"
-
-
-# --- Các Schema Item (Sản phẩm trong đơn hàng) ---
 
 
 class OrderItemBase(BaseModel):
@@ -37,6 +33,15 @@ class OrderItemCreate(OrderItemBase):
 
 
 class OrderItemOut(OrderItemBase):
+    @field_validator("ProductID", mode="before")
+    @classmethod
+    def cast_product_id(cls, v):
+        # Accept ObjectId or string and return a plain string id
+        try:
+            return str(v) if v is not None else v
+        except Exception:
+            return v
+
     class Config:
         from_attributes = True
 
@@ -108,3 +113,11 @@ class OrderOut(OrderBase):
     @classmethod
     def cast_id(cls, v):
         return str(v) if v else None
+
+    @field_validator("UserID", mode="before")
+    @classmethod
+    def cast_user_id(cls, v):
+        try:
+            return str(v) if v is not None else v
+        except Exception:
+            return v
