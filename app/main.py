@@ -16,7 +16,7 @@ from app.modules.shippers.routes import router as shippers_router
 # from app.modules.admin_accountview.routes import router as admin_accountview_router
 from app.modules.shipments.routes import router as shipments_router
 
-# ✅ Tạo app chính
+#  Tạo app chính
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
@@ -24,7 +24,7 @@ app = FastAPI(
 )
 
 
-# ✅ Cấu hình CORS trước khi include router
+#  Cấu hình CORS trước khi include router
 origins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
@@ -32,23 +32,16 @@ origins = [
     "http://127.0.0.1",
 ]
 
-# app.add_middleware(
-#     CORSMiddleware,
-#     allow_origins=origins,          # ✅ Cho phép frontend
-#     allow_credentials=True,
-#     allow_methods=["*"],            # ✅ Cho tất cả phương thức (POST, GET, ...)
-#     allow_headers=["*"],            # ✅ Cho tất cả headers (Authorization, Content-Type,...)
-# )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,  # ✅ Cho phép frontend
+    allow_origins=origins,  #  Cho phép frontend
     allow_credentials=True,
-    allow_methods=["*"],  # ✅ Cho tất cả phương thức (POST, GET, ...)
-    allow_headers=["*"],  # ✅ Cho tất cả headers (Authorization, Content-Type,...)
+    allow_methods=["*"],  #  Cho tất cả phương thức (POST, GET, ...)
+    allow_headers=["*"],  #  Cho tất cả headers (Authorization, Content-Type,...)
 )
 
-# ✅ Gắn các router (API modules)
+#  Gắn các router (API modules)
 app.include_router(auth_router, prefix="/api/auth", tags=["Auth"])
 app.include_router(users_router, prefix="/api/users", tags=["Users"])
 app.include_router(products_router, prefix="/api/products", tags=["Products"])
@@ -66,25 +59,34 @@ app.include_router(shipments_router, prefix="/api/shipments", tags=["shipments"]
 app.include_router(admin_accountview_router, prefix="/api/admin", tags=["Admin"])
 
 
-# ✅ Khi app khởi động
+#  Khi app khởi động
 @app.on_event("startup")
 async def on_startup() -> None:
-    await init_db()
+    import traceback
 
-    # Khởi tạo các role mặc định
-    for role_name in ["User", "Admin"]:
-        existing_role = await Role.find_one(Role.RoleName == role_name)
-        if not existing_role:
-            await Role(RoleName=role_name).insert()
-            print(f"✅ Role '{role_name}' đã được tạo.")
+    try:
+        await init_db()
+
+        # Khởi tạo các role mặc định
+        for role_name in ["User", "Admin"]:
+            existing_role = await Role.find_one(Role.RoleName == role_name)
+            if not existing_role:
+                await Role(RoleName=role_name).insert()
+                print(f"✅ Role '{role_name}' đã được tạo.")
+    except Exception:
+        # Print full traceback to container logs for easier debugging but don't re-raise
+        print("Error during startup initialization:")
+        traceback.print_exc()
+        # Optionally, you may want to re-raise in production. For now we keep server up so requests
+        # hit the app and we can see errors in logs. Adjust as needed.
 
 
-# ✅ Health check endpoint
+#  Health check endpoint
 @app.get("/", tags=["Health"])
 async def root():
     return {"status": "ok", "version": settings.APP_VERSION}
 
 
-# ✅ Debug: In danh sách route ra console
+#  Debug: In danh sách route ra console
 for route in app.routes:
-    print(f"✅ Route loaded: {route.path}")
+    print(f" Route loaded: {route.path}")

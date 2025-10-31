@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 
 from app.core.deps import get_current_account, require_admin_account
 from app.modules.shipments.schemas import (
@@ -93,10 +93,9 @@ async def list_all_shipments(
         )
 
 
+# get id to view
 @router.get("/{shipment_id}", response_model=ShipmentOut)
-async def get_shipment_endpoint(
-    shipment_id: str, current_account: Account = Depends(get_current_account)
-):
+async def get_shipment_endpoint(shipment_id: str, request: Request):
     shipment = await get_shipment(shipment_id)
     if not shipment:
         raise HTTPException(
@@ -121,11 +120,12 @@ async def get_shipper_shipments(
     return [ShipmentOut.model_validate(s, from_attributes=True) for s in shipments]
 
 
+# edit
 @router.patch("/{shipment_id}", response_model=ShipmentOut)
 async def update_shipment_endpoint(
     shipment_id: str,
     shipment_data: ShipmentUpdate,
-    current_account: Account = Depends(require_admin_account),
+    # current_account: Account = Depends(get_current_account),
 ):
     shipment = await update_shipment(shipment_id, shipment_data)
     if not shipment:

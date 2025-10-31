@@ -23,6 +23,8 @@ class Shipper(Document):
             PydanticObjectId: str,
         }
 
+        populate_by_name = True
+
     async def save(self, *args, **kwargs):  # type: ignore[override]
         self.UpdatedAt = datetime.utcnow()  # Cập nhật UpdatedAt mỗi khi lưu tài liệu
         return await super().save(*args, **kwargs)

@@ -2,6 +2,7 @@ from typing import List, Optional
 
 from app.modules.shipments.model import Shipment
 from app.modules.shipments.schemas import ShipmentUpdate, ShipmentStatus
+from enum import Enum as _Enum
 
 
 async def create_shipment(shipment_data: dict) -> Optional[Shipment]:
@@ -35,6 +36,11 @@ async def update_shipment(
 
     update_data = shipment_data.model_dump(exclude_unset=True)
     for field, value in update_data.items():
+        # If value is an Enum (like ShipmentStatus), convert to its value string
+        if isinstance(value, _Enum):
+            value = value.value
+
+        # If updating nested/ID fields, ensure correct types if needed (keep simple assignment for now)
         setattr(shipment, field, value)
 
     await shipment.save()
@@ -52,13 +58,16 @@ async def delete_shipment(shipment_id: str) -> bool:
 
 async def get_shipment_stats() -> dict:
     total_shipments = await Shipment.all().count()
-
-    preparing = await Shipment.find(
-        Shipment.Status == ShipmentStatus.PREPARING.value
+    pending = await Shipment.find(
+        Shipment.Status == ShipmentStatus.PENDING.value
     ).count()
 
-    delivering = await Shipment.find(
-        Shipment.Status == ShipmentStatus.IN_TRANSIT.value
+    processing = await Shipment.find(
+        Shipment.Status == ShipmentStatus.PROCESSING.value
+    ).count()
+
+    shipped = await Shipment.find(
+        Shipment.Status == ShipmentStatus.SHIPPED.value
     ).count()
 
     delivered = await Shipment.find(
@@ -67,8 +76,9 @@ async def get_shipment_stats() -> dict:
 
     return {
         "TotalShipments": total_shipments,
-        "Preparing": preparing,
-        "Delivering": delivering,
+        "Pending": pending,
+        "Processing": processing,
+        "Shipped": shipped,
         "Delivered": delivered,
     }
 
