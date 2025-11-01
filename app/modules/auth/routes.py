@@ -24,8 +24,9 @@ from app.modules.auth.controller import (
     reset_password,
     set_account_role,
     set_account_status,
+    create_login_token
 )
-from app.modules.users.schemas import UserOut
+from app.modules.users.schemas import UserOut, UserWithEmailOut
 from app.modules.auth.model import Account, Role
 from app.modules.users.model import User
 from bson import ObjectId
@@ -78,25 +79,23 @@ async def register(data: RegisterRequest):
 
 @router.post("/login")
 async def login_for_access_token(payload: LoginRequest):
-    """Login endpoint.
-
-    NOTE: token issuance is currently commented out per request — this endpoint
-    will authenticate the user but does not return an access token. If you need
-    the token later, uncomment the create_login_token call and the response.
-    """
+    
     print("📩 Raw payload:", payload)
 
-    account, user = await authenticate_user(payload.Email, payload.Password)
+    account, user,  = await authenticate_user(payload.Email, payload.Password)
 
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
 
-    # role lookup removed because token issuance is commented out
+    role_name = "User"  # default
+    if getattr(account, "RoleID", None):
+        role = await Role.get(account.RoleID)
+        if role and role.RoleName:
+            role_name = role.RoleName
 
-    # access_token = await create_login_token(account, role_name)
-    # return Token(AccessToken=access_token, RefreshToken=None)
-
-    return {"message": "Login successful (token issuance commented out)"}
+    print(f"🎭 Role name cho account {account.Email}: {role_name}")
+    access_token = create_login_token(account, role_name)
+    return Token(AccessToken=access_token, RefreshToken=None)
 
 
 @router.post("/forgot-password")
@@ -122,18 +121,20 @@ async def refresh_token(_: RefreshTokenRequest):
 # ------------------- AUTH ROUTES -------------------
 
 
-@router.get("/me", response_model=UserOut)
+@router.get("/me", response_model=UserWithEmailOut)
 async def read_me(current_account: Account = Depends(get_current_account)):
-    print("🔐 Current account ID:", current_account.id)
 
     user = await User.find_one(User.AccountID == ObjectId(current_account.id))
+
     if not user:
-        print("❌ Không tìm thấy user với AccountID:", current_account.id)
+        print(" Không tìm thấy user với AccountID:", current_account.id)
         raise HTTPException(status_code=404, detail="User not found")
 
-    print(" Tìm thấy user:", user.FullName)
+    print("Tìm thấy user:", user.FullName)
     user_dict = user.to_dict() if hasattr(user, "to_dict") else user.dict()
-    return UserOut.model_validate(user_dict)
+    user_dict["Email"] = current_account.Email
+
+    return UserWithEmailOut.model_validate(user_dict)
 
 
 @router.post("/logout")
@@ -222,7 +223,7 @@ async def get_account_detail(account_id: str):
 @router.patch(
     "/accounts/{account_id}/status",
     response_model=AccountOut,
-    dependencies=[Depends(require_admin_account)],
+    # dependencies=[Depends(require_admin_account)],
 )
 async def update_account_status(account_id: str, payload: dict):
     status_value = payload.get("status")
@@ -233,8 +234,7 @@ async def update_account_status(account_id: str, payload: dict):
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
 
-    return AccountOut.model_validate(account.to_dict())
-
+    return AccountOut.model_validate(account.model_dump())
 
 @router.patch(
     "/accounts/{account_id}/role",

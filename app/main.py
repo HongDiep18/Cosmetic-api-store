@@ -13,7 +13,7 @@ from app.modules.categories.routes import router as categories_router
 from app.modules.reviews.routes import router as reviews_router
 from app.modules.shippers.routes import router as shippers_router
 
-# from app.modules.admin_accountview.routes import router as admin_accountview_router
+from app.modules.account.routes import router as account_router
 from app.modules.shipments.routes import router as shipments_router
 
 #  Tạo app chính
@@ -63,6 +63,7 @@ try:
     app.include_router(reviews_router, prefix="/api/reviews", tags=["Reviews"])
     app.include_router(shippers_router, prefix="/api/shippers", tags=["Shippers"])
     app.include_router(shipments_router, prefix="/api/shipments", tags=["shipments"])
+    app.include_router(account_router, prefix="/api/accounts", tags=["Account"])
 except Exception as e:
     print(f"❌ Error registering routers: {e}")
     import traceback
@@ -98,24 +99,31 @@ async def root():
 
 
 #  Debug: In danh sách route ra console
-print("\n" + "="*60)
-print("📋 ALL REGISTERED ROUTES:")
-print("="*60)
-products_routes = []
+# print("\n" + "="*60)
+# print("📋 ALL REGISTERED ROUTES:")
+# print("="*60)
+# products_routes = []
+# for route in app.routes:
+#     if hasattr(route, 'path'):
+#         methods = list(getattr(route, 'methods', set()))
+#         route_info = f"  {', '.join(methods):<12} {route.path}"
+#         print(route_info)
+#         if '/api/products' in route.path:
+#             products_routes.append(route.path)
+# print("="*60)
+# print(f"✅ Total routes: {len([r for r in app.routes if hasattr(r, 'path')])}")
+# print(f"✅ Products routes found: {len(products_routes)}")
+# if products_routes:
+#     print("   Products endpoints:")
+#     for r in products_routes:
+#         print(f"     - {r}")
+# else:
+#     print("   ⚠️ WARNING: No products routes found!")
+# print("="*60 + "\n")
+
+
+
+
+
 for route in app.routes:
-    if hasattr(route, 'path'):
-        methods = list(getattr(route, 'methods', set()))
-        route_info = f"  {', '.join(methods):<12} {route.path}"
-        print(route_info)
-        if '/api/products' in route.path:
-            products_routes.append(route.path)
-print("="*60)
-print(f"✅ Total routes: {len([r for r in app.routes if hasattr(r, 'path')])}")
-print(f"✅ Products routes found: {len(products_routes)}")
-if products_routes:
-    print("   Products endpoints:")
-    for r in products_routes:
-        print(f"     - {r}")
-else:
-    print("   ⚠️ WARNING: No products routes found!")
-print("="*60 + "\n")
+    print(f"✅ Route loaded: {route.path}")

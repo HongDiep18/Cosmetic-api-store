@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-
+from fastapi.responses import JSONResponse
+import traceback
 from app.core.deps import require_admin_account
 from app.modules.shippers.schemas import ShipperCreate, ShipperOut, ShipperUpdate
 from app.modules.shippers.controller import (
     create_shipper,
+    create_account_shipper,
     get_shipper,
     list_shippers,
     update_shipper,
@@ -21,6 +23,35 @@ async def create_shipper_endpoint(
 ):
     shipper = await create_shipper(data)
     return ShipperOut.model_validate(shipper, from_attributes=True)
+
+
+
+@router.post("", response_model=ShipperOut, 
+            #  status_code=status.HTTP_201_CREATED
+             )
+async def create_shipper_account(
+    data: ShipperCreate,
+    # _: str = Depends(require_admin_account),
+):
+    print("📩 Dữ liệu nhận được:", data.model_dump())
+    try:
+        # Gọi controller tạo tài khoản + user
+        shipper_dict = await create_account_shipper(data)
+        # Validate output schema
+        validated_user = ShipperOut.model_validate(shipper_dict)
+        return validated_user
+
+    except Exception as e:
+        print("❌ ValidationError chi tiết:")
+        traceback.print_exc()
+        return JSONResponse(
+            status_code=400,
+            content={
+                "error": "Response model validation failed",
+                "details": str(e),
+            },
+        )
+
 
 
 # get all shippers
