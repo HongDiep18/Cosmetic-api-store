@@ -3,7 +3,15 @@ from datetime import datetime
 from beanie import Document, PydanticObjectId
 from pydantic import BaseModel, Field
 from bson import ObjectId
-from .schemas import OrderStatus
+from enum import Enum
+
+
+class OrderStatus(str, Enum):
+    PENDING = "Pending"
+    PROCESSING = "Processing"
+    SHIPPED = "Shipped"
+    DELIVERED = "Delivered"
+    CANCELLED = "Cancelled"
 
 
 class OrderItem(BaseModel):

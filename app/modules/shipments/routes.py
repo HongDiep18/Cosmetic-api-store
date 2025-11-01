@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.deps import get_current_account, require_admin_account
 from app.modules.shipments.schemas import (
@@ -6,7 +6,6 @@ from app.modules.shipments.schemas import (
     ShipmentUpdate,
     ShipmentOut,
     ShipmentStatsOut,
-    ShipmentListResponse,
 )
 from app.modules.shipments.controller import (
     create_shipment,
@@ -16,7 +15,6 @@ from app.modules.shipments.controller import (
     update_shipment,
     delete_shipment,
     get_shipment_stats,
-    get_all_shipments_with_details,
 )
 from app.modules.auth.model import Account
 from beanie import PydanticObjectId
@@ -76,26 +74,10 @@ async def create_shipment_endpoint(
         )
 
 
-# get list all shipments with details
-@router.get("/list-all", response_model=list[ShipmentListResponse])
-async def list_all_shipments(
-    # current_account: Account = Depends(require_admin_account),
-):
-    try:
-        shipments = await get_all_shipments_with_details()
-        if not shipments:
-            return []
-        return shipments
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error fetching shipments: {str(e)}",
-        )
-
-
-# get id to view
 @router.get("/{shipment_id}", response_model=ShipmentOut)
-async def get_shipment_endpoint(shipment_id: str, request: Request):
+async def get_shipment_endpoint(
+    shipment_id: str, current_account: Account = Depends(get_current_account)
+):
     shipment = await get_shipment(shipment_id)
     if not shipment:
         raise HTTPException(
@@ -120,12 +102,11 @@ async def get_shipper_shipments(
     return [ShipmentOut.model_validate(s, from_attributes=True) for s in shipments]
 
 
-# edit
 @router.patch("/{shipment_id}", response_model=ShipmentOut)
 async def update_shipment_endpoint(
     shipment_id: str,
     shipment_data: ShipmentUpdate,
-    # current_account: Account = Depends(get_current_account),
+    current_account: Account = Depends(require_admin_account),
 ):
     shipment = await update_shipment(shipment_id, shipment_data)
     if not shipment:

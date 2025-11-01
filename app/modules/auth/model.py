@@ -7,9 +7,7 @@ from bson import ObjectId
 
 
 class Role(Document):
-    RoleID: Optional[PydanticObjectId] = Field(
-        default_factory=PydanticObjectId, alias="_id"
-    )
+    RoleID: Optional[PydanticObjectId] = Field( default_factory=PydanticObjectId, alias="_id")
     RoleName: str
     CreatedAt: datetime = Field(default_factory=datetime.utcnow)
     UpdatedAt: datetime = Field(default_factory=datetime.utcnow)

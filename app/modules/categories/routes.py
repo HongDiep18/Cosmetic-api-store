@@ -25,7 +25,7 @@ router = APIRouter()
     "/",
     response_model=CategoryOut,
     status_code=status.HTTP_201_CREATED,
-    # # dependencies=[Depends(require_admin_account)],
+    dependencies=[Depends(require_admin_account)],
 )
 async def create_category_endpoint(data: CategoryCreate):
     category = await create_category(data)
@@ -54,7 +54,7 @@ async def get_category_endpoint(category_id: str):
 @router.put(
     "/{category_id}",
     response_model=CategoryOut,
-    # dependencies=[Depends(require_admin_account)],
+    dependencies=[Depends(require_admin_account)],
 )
 async def update_category_endpoint(category_id: str, data: CategoryUpdate):
     category = await update_category(category_id, data)
@@ -68,7 +68,7 @@ async def update_category_endpoint(category_id: str, data: CategoryUpdate):
 @router.delete(
     "/{category_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    # dependencies=[Depends(require_admin_account)],
+    dependencies=[Depends(require_admin_account)],
 )
 async def delete_category_endpoint(category_id: str):
     ok = await delete_category(category_id)

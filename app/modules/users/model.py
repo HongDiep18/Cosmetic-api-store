@@ -11,9 +11,9 @@ from beanie import Document, PydanticObjectId
 class User(Document):
     UserID: Optional[PydanticObjectId] = Field(default_factory=PydanticObjectId, alias="_id")
     AccountID: Optional[PydanticObjectId]
-    FullName: str = Field(default="")
-    Phone: Optional[str] = None
-    Address: Optional[str] = None
+    FullName: str
+    Phone: str
+    Address: str
     CreatedAt: datetime = Field(default_factory=datetime.utcnow)
     UpdatedAt: datetime = Field(default_factory=datetime.utcnow)
 
@@ -25,6 +25,7 @@ class User(Document):
         json_encoders = {
             ObjectId: str,
             PydanticObjectId: str,
+            
         }
 
     async def save(self, *args, **kwargs):  # type: ignore[override]

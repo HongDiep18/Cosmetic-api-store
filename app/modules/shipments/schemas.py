@@ -3,23 +3,21 @@ from typing import Optional
 from datetime import datetime
 from pydantic import BaseModel, field_validator
 from beanie import PydanticObjectId
-from bson import ObjectId
 from enum import Enum
 
 
 class ShipmentStatus(str, Enum):
-    PENDING = "Pending"
-    PROCESSING = "Processing"
-    SHIPPED = "Shipped"
+    PREPARING = "Preparing"
+    IN_TRANSIT = "In Transit"
     DELIVERED = "Delivered"
-    CANCELLED = "Cancelled"
+    FAILED = "Failed"
 
 
 class ShipmentBase(BaseModel):
     OrderID: str  # Accept string in API but convert to PydanticObjectId in handler
     ShipperID: str  # Accept string in API but convert to PydanticObjectId in handler
     TrackingNumber: Optional[str] = None
-    Status: ShipmentStatus = ShipmentStatus.PENDING
+    Status: ShipmentStatus = ShipmentStatus.PREPARING
     ShipmentDate: Optional[datetime] = None
     EstimatedDeliveryDate: Optional[datetime] = None
     ActualDeliveryDate: Optional[datetime] = None
@@ -63,28 +61,9 @@ class ShipmentOut(ShipmentBase):
 
 class ShipmentStatsOut(BaseModel):
     TotalShipments: int
-    Pending: int
-    Processing: int
-    Shipped: int
+    Preparing: int
+    Delivering: int
     Delivered: int
 
     class Config:
         from_attributes = True
-
-
-class ShipmentListResponse(BaseModel):
-    ShipmentID: str
-    TrackingNumber: Optional[str] = None
-    OrderID: Optional[str] = None
-    EstimatedDeliveryDate: Optional[datetime] = None
-    ActualDeliveryDate: Optional[datetime] = None
-    Status: ShipmentStatus
-    ShipperName: Optional[str] = None
-
-    class Config:
-        from_attributes = True
-        json_encoders = {
-            ObjectId: str,
-            PydanticObjectId: str,
-            datetime: lambda v: v.isoformat() if v else None,
-        }

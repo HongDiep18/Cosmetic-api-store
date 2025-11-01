@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-
+from fastapi.responses import JSONResponse
+import traceback
 from app.core.deps import require_admin_account
 from app.modules.shippers.schemas import ShipperCreate, ShipperOut, ShipperUpdate
 from app.modules.shippers.controller import (
@@ -14,13 +15,44 @@ router = APIRouter()
 
 
 # create shipper
-@router.post("/", response_model=ShipperOut, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=ShipperOut, 
+            #  status_code=status.HTTP_201_CREATED
+             )
 async def create_shipper_endpoint(
     data: ShipperCreate,
     # _: str = Depends(require_admin_account),
 ):
-    shipper = await create_shipper(data)
-    return ShipperOut.model_validate(shipper, from_attributes=True)
+    print("📩 Dữ liệu nhận được:", data.model_dump())
+    try:
+        # Gọi controller tạo tài khoản + user
+        shipper = await create_shipper(data)
+
+        # Convert user sang dict
+        if hasattr(shipper, "to_dict"):
+            shipper_dict = shipper.to_dict()
+        elif hasattr(shipper, "model_dump"):
+            shipper_dict = shipper.model_dump()
+        elif isinstance(shipper, dict):
+            shipper_dict = shipper
+        else:
+            raise TypeError(f"❌ Không biết cách convert kiểu {type(shipper_dict)} sang dict")
+
+        print("\n\nShipperr dict trả về:", shipper_dict)
+
+        # Validate output schema
+        validated_user = ShipperOut.model_validate(shipper)
+        return validated_user
+
+    except Exception as e:
+        print("❌ ValidationError chi tiết:")
+        traceback.print_exc()
+        return JSONResponse(
+            status_code=400,
+            content={
+                "error": "Response model validation failed",
+                "details": str(e),
+            },
+        )
 
 
 # get all shippers
@@ -49,13 +81,13 @@ async def get_shipper_endpoint(
     return ShipperOut.model_validate(shipper, from_attributes=True)
 
 
-@router.patch("/{shipper_id}", response_model=ShipperOut)
+@router.patch("/{shipperId}", response_model = ShipperOut)
 async def update_shipper_endpoint(
-    shipper_id: str,
+    shipperId: str,
     data: ShipperUpdate,
-    _: str = Depends(require_admin_account),
+    # _: str = Depends(require_admin_account),
 ):
-    shipper = await update_shipper(shipper_id, data)
+    shipper = await update_shipper(shipperId, data)
     if not shipper:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Shipper not found"
@@ -74,3 +106,4 @@ async def delete_shipper_endpoint(
             status_code=status.HTTP_404_NOT_FOUND, detail="Shipper not found"
         )
     return None
+

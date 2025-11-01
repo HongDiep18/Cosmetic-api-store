@@ -17,7 +17,7 @@ class Shipment(Document):
     OrderID: Optional[PydanticObjectId]
     ShipperID: Optional[PydanticObjectId]
     TrackingNumber: Optional[str] = None
-    Status: ShipmentStatus = ShipmentStatus.PENDING
+    Status: ShipmentStatus = ShipmentStatus.PREPARING
     ShipmentDate: Optional[datetime] = None
     EstimatedDeliveryDate: Optional[datetime] = None
     ActualDeliveryDate: Optional[datetime] = None

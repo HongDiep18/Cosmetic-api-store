@@ -53,7 +53,7 @@ async def check_database_structure():
                 "   → Các field này nên ở trong collection 'accounts', không phải 'users'"
             )
         else:
-            print("    Cấu trúc collection 'users' đúng")
+            print("   ✅ Cấu trúc collection 'users' đúng")
 
     print()
 
@@ -75,7 +75,7 @@ async def check_database_structure():
         if missing_fields:
             print(f"   ⚠️  CẢNH BÁO: Thiếu các field bắt buộc: {missing_fields}")
         else:
-            print("    Cấu trúc collection 'accounts' đúng")
+            print("   ✅ Cấu trúc collection 'accounts' đúng")
 
     print()
 
