@@ -32,7 +32,8 @@ async def create_category_endpoint(data: CategoryCreate):
     return CategoryOut.model_validate(category, from_attributes=True)
 
 
-@router.get("/", response_model=list[CategoryOut])
+@router.get("", response_model=list[CategoryOut])  # Không có trailing slash
+@router.get("/", response_model=list[CategoryOut])  # Có trailing slash
 async def list_categories_endpoint(
     page: int = Query(1, ge=1),
     limit: int = Query(50, ge=1, le=200),

@@ -21,6 +21,7 @@ app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
     description="Cosmetic Store API (FastAPI + MongoDB + Beanie)",
+    redirect_slashes=False,  # Tắt redirect tự động khi thiếu/thừa trailing slash
 )
 
 
@@ -28,6 +29,10 @@ app = FastAPI(
 origins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "http://localhost:5173",  # Vite default port
+    "http://127.0.0.1:5173",
+    "http://localhost:5174",  # Vite alternate port
+    "http://127.0.0.1:5174",
     "http://localhost",
     "http://127.0.0.1",
 ]
@@ -42,18 +47,26 @@ app.add_middleware(
 )
 
 #  Gắn các router (API modules)
-app.include_router(auth_router, prefix="/api/auth", tags=["Auth"])
-app.include_router(users_router, prefix="/api/users", tags=["Users"])
-app.include_router(products_router, prefix="/api/products", tags=["Products"])
-
-app.include_router(orders_router, prefix="/api/orders", tags=["Orders"])
-
-app.include_router(categories_router, prefix="/api/categories", tags=["Categories"])
-app.include_router(reviews_router, prefix="/api/reviews", tags=["Reviews"])
-app.include_router(shippers_router, prefix="/api/shippers", tags=["Shippers"])
-# app.include_router(admin_accountview_router, prefix="/api/admin", tags=["Admin"])
-
-app.include_router(shipments_router, prefix="/api/shipments", tags=["shipments"])
+try:
+    app.include_router(auth_router, prefix="/api/auth", tags=["Auth"])
+    app.include_router(users_router, prefix="/api/users", tags=["Users"])
+    
+    # Products router - quan trọng nhất
+    app.include_router(products_router, prefix="/api/products", tags=["Products"])
+    print(f"✅ Products router registered with {len(products_router.routes)} routes")
+    for route in products_router.routes:
+        if hasattr(route, 'path') and hasattr(route, 'methods'):
+            print(f"   - {' '.join(route.methods)} /api/products{route.path}")
+    
+    app.include_router(orders_router, prefix="/api/orders", tags=["Orders"])
+    app.include_router(categories_router, prefix="/api/categories", tags=["Categories"])
+    app.include_router(reviews_router, prefix="/api/reviews", tags=["Reviews"])
+    app.include_router(shippers_router, prefix="/api/shippers", tags=["Shippers"])
+    app.include_router(shipments_router, prefix="/api/shipments", tags=["shipments"])
+except Exception as e:
+    print(f"❌ Error registering routers: {e}")
+    import traceback
+    traceback.print_exc()
 
 
 #  Khi app khởi động
@@ -85,5 +98,24 @@ async def root():
 
 
 #  Debug: In danh sách route ra console
+print("\n" + "="*60)
+print("📋 ALL REGISTERED ROUTES:")
+print("="*60)
+products_routes = []
 for route in app.routes:
-    print(f" Route loaded: {route.path}")
+    if hasattr(route, 'path'):
+        methods = list(getattr(route, 'methods', set()))
+        route_info = f"  {', '.join(methods):<12} {route.path}"
+        print(route_info)
+        if '/api/products' in route.path:
+            products_routes.append(route.path)
+print("="*60)
+print(f"✅ Total routes: {len([r for r in app.routes if hasattr(r, 'path')])}")
+print(f"✅ Products routes found: {len(products_routes)}")
+if products_routes:
+    print("   Products endpoints:")
+    for r in products_routes:
+        print(f"     - {r}")
+else:
+    print("   ⚠️ WARNING: No products routes found!")
+print("="*60 + "\n")

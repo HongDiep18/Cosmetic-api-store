@@ -9,12 +9,11 @@ from fastapi import (
     File,
 )
 from fastapi.responses import JSONResponse
-from fastapi import Response
 from fastapi.staticfiles import StaticFiles
 
 from app.core.deps import require_admin_account
 from app.modules.products.model import Product
-from app.modules.products.schemas import ProductCreate, ProductOut, ProductUpdate
+from app.modules.products.schemas import ProductCreate, ProductOut, ProductUpdate, PaginatedResponse
 from app.modules.products.utils import save_upload_file
 from app.modules.products.controller import (
     create_product,
@@ -28,9 +27,56 @@ from app.modules.products.controller import (
 router = APIRouter()
 
 
+def convert_product_to_out(product: Product) -> ProductOut:
+    """Chuyển đổi Product document thành ProductOut schema"""
+    try:
+        # Sử dụng model_dump() của Beanie Document
+        if hasattr(product, 'model_dump'):
+            product_dict = product.model_dump()
+        else:
+            # Fallback: convert từ dict
+            product_dict = dict(product)
+        
+        # Đảm bảo ProductID tồn tại (từ id của Beanie Document)
+        if not product_dict.get("ProductID"):
+            if hasattr(product, 'id') and product.id:
+                product_dict["ProductID"] = str(product.id)
+            elif hasattr(product, '_id') and product._id:
+                product_dict["ProductID"] = str(product._id)
+        
+        # Xử lý các field có thể là None hoặc ObjectId
+        if 'CategoryID' in product_dict and isinstance(product_dict['CategoryID'], dict):
+            # Nếu CategoryID là dict (ObjectId serialized)
+            if '$oid' in product_dict['CategoryID']:
+                product_dict['CategoryID'] = product_dict['CategoryID']['$oid']
+        
+        return ProductOut(**product_dict)
+    except Exception as e:
+        print(f"❌ Error converting product {getattr(product, 'id', 'unknown')}: {e}")
+        raise
+
+
 @router.get("/stats")
 async def get_products_stats_endpoint():
     return await get_products_stats()
+
+
+@router.get("/test")
+async def test_products_endpoint():
+    """Test endpoint để kiểm tra products router hoạt động"""
+    try:
+        count = await Product.find_all().count()
+        return {
+            "status": "ok",
+            "message": "Products router is working",
+            "total_products_in_db": count,
+            "router_path": "/api/products"
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": str(e)
+        }
 
 
 @router.post(
@@ -41,22 +87,47 @@ async def get_products_stats_endpoint():
 )
 async def create_product_endpoint(data: ProductCreate):
     product = await create_product(data)
-    return ProductOut.model_validate(product, from_attributes=True)
+    return convert_product_to_out(product)
 
 
-@router.get("/", response_model=list[ProductOut])
+@router.get("", response_model=PaginatedResponse)  # Không có trailing slash
+@router.get("/", response_model=PaginatedResponse)  # Có trailing slash
 async def list_products_endpoint(
-    response: Response,
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=100),
     name: str | None = None,
     categoryId: str | None = None,
 ):
-    products, total = await list_products(
-        page=page, limit=limit, name=name, categoryId=categoryId
-    )
-    response.headers["X-Total-Count"] = str(total)
-    return [ProductOut.model_validate(p, from_attributes=True) for p in products]
+    try:
+        products, total = await list_products(
+            page=page, limit=limit, name=name, categoryId=categoryId
+        )
+        total_pages = (total + limit - 1) // limit if total > 0 else 0
+        
+        # Convert products với error handling
+        product_out_list = []
+        for p in products:
+            try:
+                product_out_list.append(convert_product_to_out(p))
+            except Exception as e:
+                print(f"⚠️ Skipping product due to conversion error: {e}")
+                continue
+        
+        return PaginatedResponse(
+            data=product_out_list,
+            total=total,
+            page=page,
+            limit=limit,
+            totalPages=total_pages,
+        )
+    except Exception as e:
+        print(f"❌ Error in list_products_endpoint: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching products: {str(e)}"
+        )
 
 
 @router.get("/{product_id}", response_model=ProductOut)
@@ -66,7 +137,7 @@ async def get_product_endpoint(product_id: str):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
         )
-    return ProductOut.model_validate(product, from_attributes=True)
+    return convert_product_to_out(product)
 
 
 @router.patch(
@@ -80,7 +151,7 @@ async def update_product_endpoint(product_id: str, data: ProductUpdate):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
         )
-    return ProductOut.model_validate(product, from_attributes=True)
+    return convert_product_to_out(product)
 
 
 @router.delete(
@@ -137,6 +208,4 @@ async def delete_product_endpoint(product_id: str):
 #     return {"low_stock_count": count}
 
 
-@router.get("/stats")
-async def get_products_stats_endpoint():
-    return await get_products_stats()
+
