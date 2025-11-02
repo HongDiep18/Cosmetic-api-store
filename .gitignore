@@ -18,3 +18,4 @@ fb_state.json
 supervisord.log
 apps/supervisord.log
 *.log
+public/uploads/
