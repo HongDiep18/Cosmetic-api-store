@@ -69,9 +69,7 @@ async def authenticate_user(Email: str, Password: str) -> Tuple[Account, User]:
 # ==============================
 # 🧾 REGISTER
 # ==============================
-async def register_user(
-    Email: str, Password: str, FullName: str, Phone: str, Address: str
-):
+async def register_user(Email: str, Password: str, FullName: str, Phone: str, Address: str):
     """Đăng ký tài khoản mới"""
     email = Email.strip().lower()
     print(f"📩 Register new user: {email}")

@@ -33,3 +33,7 @@ class UserOut(UserBase):
     @classmethod
     def cast_id(cls, v):
         return str(v)
+
+
+class UserWithEmailOut(UserOut):
+    Email: str

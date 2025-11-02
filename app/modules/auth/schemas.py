@@ -96,3 +96,14 @@ class AccountOut(BaseModel):
     model_config = {
         "from_attributes": True,
     }
+
+    def to_dict(self):
+        # Trả về dict từ attributes
+        return {
+            "AccountID": self.AccountID,
+            "Email": self.Email,
+            "RoleID": self.RoleID,
+            "Status": self.Status,
+            "CreatedAt": self.CreatedAt,
+            "UpdatedAt": self.UpdatedAt,
+        }
