@@ -80,6 +80,12 @@ async def test_products_endpoint():
 
 
 @router.post(
+    "",
+    response_model=ProductOut,
+    status_code=status.HTTP_201_CREATED,
+    # # dependencies=[Depends(require_admin_account)],
+)
+@router.post(
     "/",
     response_model=ProductOut,
     status_code=status.HTTP_201_CREATED,
@@ -97,10 +103,11 @@ async def list_products_endpoint(
     limit: int = Query(10, ge=1, le=100),
     name: str | None = None,
     categoryId: str | None = None,
+    includeDiscontinued: bool = Query(False, description="Bao gồm sản phẩm đã vô hiệu hóa (dành cho admin)"),
 ):
     try:
         products, total = await list_products(
-            page=page, limit=limit, name=name, categoryId=categoryId
+            page=page, limit=limit, name=name, categoryId=categoryId, includeDiscontinued=includeDiscontinued
         )
         total_pages = (total + limit - 1) // limit if total > 0 else 0
         
