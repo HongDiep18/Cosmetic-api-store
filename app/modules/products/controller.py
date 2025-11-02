@@ -8,12 +8,19 @@ from app.modules.products.model import Product
 from app.modules.products.schemas import ProductCreate, ProductUpdate
 
 
-def _build_filters(name: Optional[str], categoryId: Optional[str]):
+def _build_filters(
+    name: Optional[str], 
+    categoryId: Optional[str],
+    includeDiscontinued: bool = False
+):
     filters = []
     if name:
         filters.append(Product.ProductName.match(RegEx(name, options="i")))
     if categoryId:
         filters.append(Product.CategoryID == categoryId)
+    # Mặc định loại bỏ sản phẩm đã vô hiệu hóa (Discontinued)
+    if not includeDiscontinued:
+        filters.append(Product.Status != "Discontinued")
     return filters
 
 
@@ -22,11 +29,12 @@ async def list_products(
     limit: int = 10,
     name: Optional[str] = None,
     categoryId: Optional[str] = None,
+    includeDiscontinued: bool = False,
 ) -> Tuple[List[Product], int]:
     page = max(page, 1)
     limit = max(limit, 1)
 
-    filters = _build_filters(name, categoryId)
+    filters = _build_filters(name, categoryId, includeDiscontinued)
     query = Product.find_many(*filters) if filters else Product.find_all()
 
     total = await query.count()
