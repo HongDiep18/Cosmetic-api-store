@@ -236,3 +236,16 @@ async def upload_image(
 
 
 
+# lấy chi tiết sản phẩm cho trang chi tiết sản phẩm
+@router.get("/{product_id}/detail")
+async def get_product_detail_endpoint(product_id: str):
+    """
+    Trả về chi tiết sản phẩm chỉ gồm các trường cơ bản:
+    ProductName, Brand, Price, Image, CategoryName, Rating, ReviewCount, IsNew, IsFeatured
+    """
+    from app.modules.products.controller import get_product_detail
+
+    product_detail = await get_product_detail(product_id)
+    if not product_detail:
+        raise HTTPException(status_code=404, detail="Product not found")
+    return product_detail

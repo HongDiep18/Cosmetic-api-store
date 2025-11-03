@@ -1,3 +1,1 @@
-uvicorn app.main:app --reload
-
-yarn add cors
+docker compose up -d --build
