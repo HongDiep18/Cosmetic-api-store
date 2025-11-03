@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 from app.core.config import settings
 from app.db.init import init_db
 
@@ -91,6 +93,11 @@ async def on_startup() -> None:
         # Optionally, you may want to re-raise in production. For now we keep server up so requests
         # hit the app and we can see errors in logs. Adjust as needed.
 
+
+uploads_dir = Path("public/uploads")
+uploads_dir.mkdir(parents=True, exist_ok=True)
+
+app.mount("/uploads", StaticFiles(directory=str(uploads_dir)), name="uploads")
 
 #  Health check endpoint
 @app.get("/", tags=["Health"])

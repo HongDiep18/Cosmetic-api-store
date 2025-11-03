@@ -92,7 +92,10 @@ async def test_products_endpoint():
     # # dependencies=[Depends(require_admin_account)],
 )
 async def create_product_endpoint(data: ProductCreate):
+    print(f"📦 Creating product with data: {data.model_dump()}")
+    print(f"📦 Product Image: {data.Image}")
     product = await create_product(data)
+    print(f"✅ Product created: {product.ProductID}, Image: {product.Image}")
     return convert_product_to_out(product)
 
 
@@ -153,11 +156,14 @@ async def get_product_endpoint(product_id: str):
     # dependencies=[Depends(require_admin_account)],
 )
 async def update_product_endpoint(product_id: str, data: ProductUpdate):
+    print(f"📦 Updating product {product_id} with data: {data.model_dump(exclude_unset=True)}")
+    print(f"📦 Product Image: {data.Image}")
     product = await update_product(product_id, data)
     if not product:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
         )
+    print(f"✅ Product updated: {product.ProductID}, Image: {product.Image}")
     return convert_product_to_out(product)
 
 
@@ -175,37 +181,51 @@ async def delete_product_endpoint(product_id: str):
     return None
 
 
-# @router.post("/upload/", # dependencies=[Depends(require_admin_account)])
-# async def upload_image(
-#     file: UploadFile = File(...),
-#     request: Request = Depends(),
-# ):
-#     if not file.content_type or not file.content_type.startswith("image/"):
-#         return JSONResponse(
-#             status_code=400, content={"error": "File uploaded is not an image"}
-#         )
+@router.post("/upload/")
+async def upload_image(
+    file: UploadFile = File(...),
+    request: Request = None,
+):
+    """Upload image file and return the URL"""
+    if not file.content_type or not file.content_type.startswith("image/"):
+        return JSONResponse(
+            status_code=400, content={"error": "File uploaded is not an image"}
+        )
 
-#     # Check file size (max 5MB)
-#     MAX_SIZE = 5 * 1024 * 1024  # 5MB
-#     content = await file.read()
-#     await file.seek(0)  # Reset file pointer
+    # Check file size (max 5MB)
+    MAX_SIZE = 5 * 1024 * 1024  # 5MB
+    content = await file.read()
+    await file.seek(0)  # Reset file pointer
 
-#     if len(content) > MAX_SIZE:
-#         return JSONResponse(
-#             status_code=400,
-#             content={"error": "File size too large. Maximum size is 5MB"},
-#         )
+    if len(content) > MAX_SIZE:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "File size too large. Maximum size is 5MB"},
+        )
 
-#     try:
-#         # Get base URL from request
-#         base_url = str(request.base_url).rstrip("/")
-#         file_url = await save_upload_file(file, base_url)
-#         return {"url": file_url}
-#     except Exception as e:
-#         return JSONResponse(
-#             status_code=500,
-#             content={"error": f"An error occurred while uploading the file: {str(e)}"},
-#         )
+    try:
+        # Get base URL from request
+        base_url = "http://localhost:8000"
+        if request:
+            base_url = str(request.base_url).rstrip("/")
+        
+        print(f"📤 Uploading file: {file.filename}, size: {file.size if hasattr(file, 'size') else 'unknown'}")
+        
+        # Save file and get URL
+        file_url = await save_upload_file(file, base_url)
+        
+        # Log để debug
+        print(f"✅ Image uploaded successfully: {file_url}")
+        
+        return {"url": file_url}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"❌ Error uploading file: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"An error occurred while uploading the file: {str(e)}"},
+        )
 
 
 # # Get số lượng sản phẩm sắp hết (Stock <= 5)

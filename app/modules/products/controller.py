@@ -45,8 +45,11 @@ async def list_products(
 
 
 async def create_product(data: ProductCreate) -> Product:
-    product = Product(**data.model_dump())
+    product_data = data.model_dump()
+    print(f"📦 Creating product - Image field: {product_data.get('Image')}")
+    product = Product(**product_data)
     await product.insert()
+    print(f"✅ Product created with Image: {product.Image}")
     return product
 
 
@@ -72,9 +75,11 @@ async def update_product(product_id: str, data: ProductUpdate) -> Optional[Produ
     if product:
         print(f"✅ Found product by ProductID: {product.ProductID}")
         update_data = data.model_dump(exclude_unset=True)
+        print(f"📦 Update data - Image field: {update_data.get('Image')}")
         for key, value in update_data.items():
             setattr(product, key, value)
         await product.save()
+        print(f"✅ Product updated with Image: {product.Image}")
         return product
     # Nếu không tìm thấy, thử tìm theo _id ObjectId (cho backward compatibility)
     try:
