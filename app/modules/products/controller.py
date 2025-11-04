@@ -169,3 +169,28 @@ async def get_products_stats() -> dict:
         "outOfStock": out_of_stock,
         "totalValue": total_value,
     }
+
+# Hàm lấy thông tin chi tiết sản phẩm theo ID (chỉ chọn vài trường)
+# Hàm lấy chi tiết sản phẩm
+async def get_product_detail(product_id: str) -> Optional[dict]:
+    #Tìm theo _id bằng phương thức get (chuẩn nhất)
+    product = None
+    if ObjectId.is_valid(product_id):
+        product = await Product.get(ObjectId(product_id))
+
+    # Nếu không thấy thì trả None
+    if not product:
+        return None
+
+    # Trả về các trường cần thiết
+    return {
+        "ProductName": getattr(product, "ProductName", None),
+        "Brand": getattr(product, "Brand", None),
+        "Price": getattr(product, "Price", None),
+        "Image": getattr(product, "Image", None),
+        "CategoryName": getattr(product, "CategoryName", None),
+        "Rating": getattr(product, "Rating", None),
+        "ReviewCount": getattr(product, "ReviewCount", None),
+        "IsNew": getattr(product, "IsNew", None),
+        "IsFeatured": getattr(product, "IsFeatured", None),
+    }
