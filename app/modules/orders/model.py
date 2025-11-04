@@ -46,7 +46,8 @@ from typing import Optional
 
 
 class OrderItem(BaseModel):
-    ProductID: Optional[PydanticObjectId] 
+    ProductID: str
+    # ProductID: Optional[PydanticObjectId] 
     Quantity: int = Field(ge=1)
     Price: float = Field(ge=0)
     
@@ -87,6 +88,3 @@ class Order(Document):
     async def save(self, *args, **kwargs):  # type: ignore[override]
         self.UpdatedAt = datetime.utcnow()
         return await super().save(*args, **kwargs)
-    
-
-    
