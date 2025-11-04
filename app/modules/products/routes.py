@@ -8,12 +8,13 @@ from fastapi import (
     UploadFile,
     File,
 )
+from beanie import Document, Indexed, PydanticObjectId
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.core.deps import require_admin_account
 from app.modules.products.model import Product
-from app.modules.products.schemas import ProductCreate, ProductOut, ProductUpdate, PaginatedResponse
+from app.modules.products.schemas import ProductCreate, ProductOut, ProductUpdate, PaginatedResponse, StockUpdateRequest
 from app.modules.products.utils import save_upload_file
 from app.modules.products.controller import (
     create_product,
@@ -30,27 +31,8 @@ router = APIRouter()
 def convert_product_to_out(product: Product) -> ProductOut:
     """Chuyển đổi Product document thành ProductOut schema"""
     try:
-        # Sử dụng model_dump() của Beanie Document
-        if hasattr(product, 'model_dump'):
-            product_dict = product.model_dump()
-        else:
-            # Fallback: convert từ dict
-            product_dict = dict(product)
-        
-        # Đảm bảo ProductID tồn tại (từ id của Beanie Document)
-        if not product_dict.get("ProductID"):
-            if hasattr(product, 'id') and product.id:
-                product_dict["ProductID"] = str(product.id)
-            elif hasattr(product, '_id') and product._id:
-                product_dict["ProductID"] = str(product._id)
-        
-        # Xử lý các field có thể là None hoặc ObjectId
-        if 'CategoryID' in product_dict and isinstance(product_dict['CategoryID'], dict):
-            # Nếu CategoryID là dict (ObjectId serialized)
-            if '$oid' in product_dict['CategoryID']:
-                product_dict['CategoryID'] = product_dict['CategoryID']['$oid']
-        
-        return ProductOut(**product_dict)
+        # Sử dụng model_validate trực tiếp từ Beanie Document
+        return ProductOut.model_validate(product, from_attributes=True)
     except Exception as e:
         print(f"❌ Error converting product {getattr(product, 'id', 'unknown')}: {e}")
         raise
@@ -95,7 +77,7 @@ async def create_product_endpoint(data: ProductCreate):
     print(f"📦 Creating product with data: {data.model_dump()}")
     print(f"📦 Product Image: {data.Image}")
     product = await create_product(data)
-    print(f"✅ Product created: {product.ProductID}, Image: {product.Image}")
+    print(f"✅ Product created: {product.id}, Image: {product.Image}")
     return convert_product_to_out(product)
 
 
@@ -163,40 +145,8 @@ async def update_product_endpoint(product_id: str, data: ProductUpdate):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
         )
-    print(f"✅ Product updated: {product.ProductID}, Image: {product.Image}")
+    print(f"✅ Product updated: {product.id}, Image: {product.Image}")
     return convert_product_to_out(product)
-
-
-@router.patch(
-    "/{product_id}/stock",
-    response_model=ProductOut,
-    # dependencies=[Depends(require_admin_account)],
-)
-async def update_product_stock(product_id: str, payload: dict):
-    """
-    Cập nhật tồn kho (stock) cho 1 sản phẩm.
-    Dùng khi admin muốn trừ/thêm stock thủ công.
-    """
-    stock_value = payload.get("stock")
-    if stock_value is None:
-        raise HTTPException(status_code=400, detail="stock is required")
-
-    # Lấy sản phẩm
-    product = await Product.get(product_id)
-    if not product:
-        raise HTTPException(status_code=404, detail="Product not found")
-
-    # Cập nhật tồn kho
-    try:
-        change_value = payload.get("change")  # ví dụ: -2 hoặc +5
-        if change_value is not None:
-            product.Stock += change_value
-        else:
-            product.Stock = stock_value
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error updating stock: {str(e)}")
-
-    return ProductOut.model_validate(product, from_attributes=True)
 
 
 @router.delete(
@@ -267,3 +217,29 @@ async def upload_image(
 #     return {"low_stock_count": count}
 
 
+
+# lấy chi tiết sản phẩm cho trang chi tiết sản phẩm
+@router.get("/{product_id}/detail")
+async def get_product_detail_endpoint(product_id: str):
+    """
+    Trả về chi tiết sản phẩm chỉ gồm các trường cơ bản:
+    ProductName, Brand, Price, Image, CategoryName, Rating, ReviewCount, IsNew, IsFeatured
+    """
+    from app.modules.products.controller import get_product_detail
+
+    product_detail = await get_product_detail(product_id)
+    if not product_detail:
+        raise HTTPException(status_code=404, detail="Product not found")
+    return product_detail
+
+# Cập nhật số lượng tồn kho
+@router.put("/{product_id}/stock")
+async def update_stock(product_id: str, data: StockUpdateRequest):
+    product = await Product.get(PydanticObjectId(product_id))
+    if not product:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+
+    product.Stock = data.quantity
+    await product.save()
+
+    return {"message": "Cập nhật tồn kho thành công"}
