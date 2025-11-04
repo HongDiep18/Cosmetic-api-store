@@ -11,6 +11,7 @@ from app.modules.orders.controller import (
     update_order_status,
     get_order_status_summary,
     get_last_7_days_total_revenue,
+    get_revenue_by_date,
     get_today_total_revenue,
     get_today_pending_orders_count,
     get_monthly_revenue,
@@ -150,6 +151,14 @@ async def revenue_last_7_days_endpoint():
     revenue = await get_last_7_days_total_revenue()
     return {"total_revenue": revenue}
 
+# Route lấy doanh thu theo ngày (YYYY-MM-DD)
+@router.get("/revenue-by-date")
+async def revenue_by_date_endpoint(date: str):
+    """
+    Lấy doanh thu của 1 ngày cụ thể (theo định dạng YYYY-MM-DD).
+    """
+    revenue = await get_revenue_by_date(date)
+    return {"revenue_by_date": revenue}
 
 # Route lấy doanh thu hôm nay
 @router.get("/revenue-today")

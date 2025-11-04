@@ -110,33 +110,31 @@ async def update_order_status(order_id: str, status: str) -> Optional[Order]:
 
 
 # get status summary
-
-
 async def get_order_status_summary():
-    pipeline = [
-        {"$match": {"Status": {"$ne": None}}},  # lọc những đơn hàng có status
-        {"$group": {"_id": "$Status", "count": {"$sum": 1}}},
-    ]
-    results = await Order.aggregate(pipeline).to_list(None)
+    # Lấy ngày hiện tại (không tính giờ, phút, giây)
+    today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    tomorrow = today + timedelta(days=1)
 
+    pipeline = [
+        {
+            "$match": {
+                "Status": {"$ne": None},
+                "CreatedAt": {"$gte": today, "$lt": tomorrow}  # chỉ lấy đơn của hôm nay
+            }
+        },
+        {
+            "$group": {
+                "_id": "$Status",
+                "count": {"$sum": 1}
+            }
+        }
+    ]
+
+    results = await Order.aggregate(pipeline).to_list(None)
     summary = {r["_id"]: r["count"] for r in results}
     return summary
 
-
-# Get revenue for the last 7 days
-# async def get_last_7_days_total_revenue() -> float:
-#     today = datetime.utcnow()
-#     seven_days_ago = today - timedelta(days=7)
-
-#     pipeline = [
-#         {"$match": {"OrderDate": {"$gte": seven_days_ago}}},
-#         {"$group": {"_id": None, "total_revenue": {"$sum": "$TotalAmount"}}}
-#     ]
-
-#     results = await Order.aggregate(pipeline).to_list(None)
-#     return results[0]["total_revenue"] if results else 0.0
-
-
+# lấy doanh thu 7 ngày gần nhất
 async def get_last_7_days_total_revenue() -> list[dict]:
     """
     Trả về doanh thu từng ngày của 7 ngày gần nhất.
@@ -185,6 +183,34 @@ async def get_last_7_days_total_revenue() -> list[dict]:
 
     return daily_revenue
 
+# lấy doanh thu từng ngày 
+# Hàm lấy doanh thu của 1 ngày cụ thể
+async def get_revenue_by_date(date: str) -> dict:
+    """
+    Trả về doanh thu của 1 ngày cụ thể (YYYY-MM-DD).
+    """
+    try:
+        # Parse ngày người dùng nhập
+        day = datetime.strptime(date, "%Y-%m-%d")
+
+        # Tạo khoảng thời gian [00:00, 23:59:59] của ngày đó
+        start = datetime(day.year, day.month, day.day)
+        end = start + timedelta(days=1)
+
+        # Pipeline MongoDB: nhóm tổng doanh thu trong ngày
+        pipeline = [
+            {"$match": {"OrderDate": {"$gte": start, "$lt": end}}},
+            {"$group": {"_id": None, "revenue": {"$sum": "$TotalAmount"}}},
+        ]
+
+        result = await Order.aggregate(pipeline).to_list(None)
+        revenue = result[0]["revenue"] if result else 0
+
+        return {"date": date, "revenue": revenue}
+
+    except Exception as e:
+        # Nếu lỗi (ví dụ sai định dạng ngày)
+        return {"date": date, "revenue": 0, "error": str(e)}
 
 # Get today's total revenue
 async def get_today_total_revenue() -> float:
@@ -322,3 +348,5 @@ async def get_best_selling_products_in_month(
 
     results = await Order.aggregate(pipeline).to_list(None)
     return results
+
+
