@@ -13,7 +13,6 @@ from beanie import Document, PydanticObjectId
 
 async def create_payment(payment_data: PaymentCreate) -> Payment:
     order = await Order.get(PydanticObjectId(payment_data.OrderID))
-    print('\n\n\norder-------------->', order)
     if not order:
         raise Exception("Order not found")
 
@@ -21,12 +20,10 @@ async def create_payment(payment_data: PaymentCreate) -> Payment:
         raise Exception("Payment amount mismatch")
 
     payment = Payment(
-        OrderID=order.id,
-        PaymentMethod= payment_data.PaymentMethod,
+        OrderID=payment_data.OrderID,
+        PaymentMethod= 'Pending'  ,
         Amount=payment_data.Amount,
     )
-    print('\n\n\payment-------------->', payment)
-
     await payment.insert()
 
     return payment

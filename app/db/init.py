@@ -10,7 +10,7 @@ from app.modules.reviews.model import Review
 from app.modules.auth.model import Role, Account
 from app.modules.shippers.model import Shipper
 from app.modules.shipments.model import Shipment
-from app.modules.payments.model import Payment
+
 async def init_db() -> None:
     client = AsyncIOMotorClient(settings.MONGODB_URI)
     db = client[settings.MONGODB_DB]
@@ -25,8 +25,7 @@ async def init_db() -> None:
             Role,
             Account,
             Shipper,
-            Shipment,
-            Payment,
+            Shipment
         ],
     )
 
