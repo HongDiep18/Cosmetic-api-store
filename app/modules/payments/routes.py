@@ -11,10 +11,10 @@ from app.modules.payments.controller import (
 )
 from app.modules.auth.model import Account
 
-router = APIRouter(prefix="/api")
+router = APIRouter()
 
 
-@router.post("/payments", response_model=PaymentOut)
+@router.post("", response_model=PaymentOut)
 async def create_payment_endpoint(
     payment_data: PaymentCreate, current_account: Account = Depends(get_current_account)
 ):
@@ -22,7 +22,7 @@ async def create_payment_endpoint(
     return PaymentOut.model_validate(payment, from_attributes=True)
 
 
-@router.get("/payments/{payment_id}", response_model=PaymentOut)
+@router.get("/{payment_id}", response_model=PaymentOut)
 async def get_payment_endpoint(
     payment_id: str, current_account: Account = Depends(get_current_account)
 ):
@@ -34,7 +34,7 @@ async def get_payment_endpoint(
     return PaymentOut.model_validate(payment, from_attributes=True)
 
 
-@router.get("/orders/{order_id}/payments", response_model=list[PaymentOut])
+@router.get("/orders/{order_id}", response_model=list[PaymentOut])
 async def get_order_payments(
     order_id: str, current_account: Account = Depends(get_current_account)
 ):
@@ -42,7 +42,7 @@ async def get_order_payments(
     return [PaymentOut.model_validate(p, from_attributes=True) for p in payments]
 
 
-@router.patch("/payments/{payment_id}", response_model=PaymentOut)
+@router.patch("/{payment_id}", response_model=PaymentOut)
 async def update_payment_endpoint(
     payment_id: str,
     payment_data: PaymentUpdate,
@@ -56,7 +56,7 @@ async def update_payment_endpoint(
     return PaymentOut.model_validate(payment, from_attributes=True)
 
 
-@router.delete("/payments/{payment_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{payment_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_payment_endpoint(
     payment_id: str, current_account: Account = Depends(require_admin_account)
 ):

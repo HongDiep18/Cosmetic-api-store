@@ -5,34 +5,49 @@ from app.modules.orders.schemas import OrderCreate
 from datetime import datetime, timedelta
 from typing import Dict
 from bson.son import SON
-
-
+from beanie import PydanticObjectId
+from fastapi import HTTPException, status
+from app.modules.products.model import Product  # Giả sử bạn có model Product để truy vấn sản phẩm
 async def create_order(user_id: str, data: OrderCreate) -> Order:
     try:
-        # Create items list
-        items: List[OrderItem] = []
+        
+        items = []
         for item in data.Items:
+            
+            # product = await Product.find_one(Product.ProductName == item.ProductName)
+            # if product is None:
+            #     print(f"Không tìm thấy sản phẩm: {item['ProductName']}")
+            #     continue
+
             items.append(
                 OrderItem(
-                    ProductID=item.ProductID,  # Use string ID directly
+                    ProductID=item.ProductID,
                     Quantity=item.Quantity,
                     Price=item.Price,
                 )
             )
 
-        # Calculate total amount
         total_amount = sum(item.Price * item.Quantity for item in items)
+        now = datetime.utcnow()
 
-        # Create and save order
+
+    
         order = Order(
-            UserID=user_id,  # Use string ID directly
+            UserID=user_id, # Convert chỉ user_id
             Items=items,
             TotalAmount=total_amount,
             ShippingAddress=data.ShippingAddress,
+            Status=data.Status if hasattr(data, "Status") else "Pending",
+            OrderDate=data.OrderDate if hasattr(data, "OrderDate") else now,
+            CreatedAt=now,
+            UpdatedAt=now,
         )
         await order.insert()
         return order
+
     except Exception as e:
+        # Log lỗi chi tiết
+        print("❌ Error creating order:", e)
         raise Exception(f"Error creating order: {str(e)}")
 
 

@@ -34,7 +34,7 @@ async def get_shipment_stats_endpoint(
 
 
 # create shipment
-@router.post("/", response_model=ShipmentOut)
+@router.post("", response_model=ShipmentOut)
 async def create_shipment_endpoint(
     shipment_data: ShipmentCreate,
     # current_account: Account = Depends(require_admin_account),

@@ -167,6 +167,38 @@ async def update_product_endpoint(product_id: str, data: ProductUpdate):
     return convert_product_to_out(product)
 
 
+@router.patch(
+    "/{product_id}/stock",
+    response_model=ProductOut,
+    # dependencies=[Depends(require_admin_account)],
+)
+async def update_product_stock(product_id: str, payload: dict):
+    """
+    Cập nhật tồn kho (stock) cho 1 sản phẩm.
+    Dùng khi admin muốn trừ/thêm stock thủ công.
+    """
+    stock_value = payload.get("stock")
+    if stock_value is None:
+        raise HTTPException(status_code=400, detail="stock is required")
+
+    # Lấy sản phẩm
+    product = await Product.get(product_id)
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    # Cập nhật tồn kho
+    try:
+        change_value = payload.get("change")  # ví dụ: -2 hoặc +5
+        if change_value is not None:
+            product.Stock += change_value
+        else:
+            product.Stock = stock_value
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error updating stock: {str(e)}")
+
+    return ProductOut.model_validate(product, from_attributes=True)
+
+
 @router.delete(
     "/{product_id}",
     status_code=status.HTTP_204_NO_CONTENT,

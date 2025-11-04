@@ -17,7 +17,7 @@ from app.modules.shippers.routes import router as shippers_router
 
 from app.modules.account.routes import router as account_router
 from app.modules.shipments.routes import router as shipments_router
-
+from app.modules.payments.routes import router as payments_router
 #  Tạo app chính
 app = FastAPI(
     title=settings.APP_NAME,
@@ -66,6 +66,8 @@ try:
     app.include_router(shippers_router, prefix="/api/shippers", tags=["Shippers"])
     app.include_router(shipments_router, prefix="/api/shipments", tags=["shipments"])
     app.include_router(account_router, prefix="/api/accounts", tags=["Account"])
+    app.include_router(payments_router, prefix="/api/payments", tags=["Payments"])
+
 except Exception as e:
     print(f"❌ Error registering routers: {e}")
     import traceback
@@ -81,7 +83,7 @@ async def on_startup() -> None:
         await init_db()
 
         # Khởi tạo các role mặc định
-        for role_name in ["User", "Admin"]:
+        for role_name in ["User", "Admin", "Shipper"]:
             existing_role = await Role.find_one(Role.RoleName == role_name)
             if not existing_role:
                 await Role(RoleName=role_name).insert()
