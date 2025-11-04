@@ -29,6 +29,7 @@ class OrderItemBase(BaseModel):
 
 
 class OrderItemCreate(OrderItemBase):
+    # ProductName: str
     pass
 
 
@@ -47,8 +48,6 @@ class OrderItemOut(OrderItemBase):
 
 
 # --- Các Schema Order (Đơn hàng) ---
-
-
 class OrderBase(BaseModel):
     UserID: str  # Will be converted to PydanticObjectId
     ShippingAddress: str

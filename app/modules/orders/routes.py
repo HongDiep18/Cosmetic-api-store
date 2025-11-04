@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.params import Query
 
-from app.core.deps import require_admin_account
+from app.core.deps import require_admin_account, get_current_account
 from app.modules.orders.schemas import OrderCreate, OrderOut
+from app.modules.users.model import User
 from app.modules.orders.controller import (
     create_order,
     get_user_orders,
@@ -20,17 +21,34 @@ from app.modules.orders.controller import (
 router = APIRouter()
 
 
+# create order test
+# @router.post("/", response_model=OrderOut, status_code=status.HTTP_201_CREATED)
+# async def create_order_endpoint(
+#     data: OrderCreate,
+#     # current_user: User = Depends(get_current_account)
+# ):
+#     try:
+#         # order = await create_order(user_id=str(current_user.id), data=data)
+#         test_user_id = "7027bdf6-be3d-42a9-8ed3-9ecc8a41ca45"
+
+#         order = await create_order(user_id=test_user_id, data=data)
+#         return OrderOut.model_validate(order, from_attributes=True)
+
+#     except ValueError as ve:
+#         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
+#     except Exception as e:
+#         raise HTTPException(
+#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+#         )
+
 # create order
-@router.post("/", response_model=OrderOut, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=OrderOut, status_code=status.HTTP_201_CREATED)
 async def create_order_endpoint(
     data: OrderCreate,
-    # current_user: User = Depends(get_current_account)
+    current_user: User = Depends(get_current_account)
 ):
     try:
-        # order = await create_order(user_id=str(current_user.id), data=data)
-        test_user_id = "7027bdf6-be3d-42a9-8ed3-9ecc8a41ca45"
-
-        order = await create_order(user_id=test_user_id, data=data)
+        order = await create_order(user_id=str(current_user.id), data=data)
         return OrderOut.model_validate(order, from_attributes=True)
 
     except ValueError as ve:
@@ -39,6 +57,7 @@ async def create_order_endpoint(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
         )
+
 
 
 # get 1 order - user view order of them
@@ -175,3 +194,7 @@ async def best_selling_products_endpoint(
     """
     products = await get_best_selling_products_in_month(year, month)
     return {"best_selling_products": products}
+
+
+
+
