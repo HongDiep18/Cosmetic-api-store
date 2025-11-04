@@ -8,20 +8,17 @@ from bson.son import SON
 from beanie import PydanticObjectId
 from fastapi import HTTPException, status
 from app.modules.products.model import Product  # Giả sử bạn có model Product để truy vấn sản phẩm
+
+
 async def create_order(user_id: str, data: OrderCreate) -> Order:
     try:
         
         items = []
         for item in data.Items:
-            
-            # product = await Product.find_one(Product.ProductName == item.ProductName)
-            # if product is None:
-            #     print(f"Không tìm thấy sản phẩm: {item['ProductName']}")
-            #     continue
 
             items.append(
                 OrderItem(
-                    ProductID=item.ProductID,
+                    ProductID=PydanticObjectId(item.ProductID),
                     Quantity=item.Quantity,
                     Price=item.Price,
                 )
@@ -37,7 +34,7 @@ async def create_order(user_id: str, data: OrderCreate) -> Order:
             Items=items,
             TotalAmount=total_amount,
             ShippingAddress=data.ShippingAddress,
-            Status=data.Status if hasattr(data, "Status") else "Pending",
+            Status= "Pending",
             OrderDate=data.OrderDate if hasattr(data, "OrderDate") else now,
             CreatedAt=now,
             UpdatedAt=now,
