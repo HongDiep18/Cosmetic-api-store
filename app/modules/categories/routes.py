@@ -16,6 +16,7 @@ from app.modules.categories.controller import (
     update_category,
 )
 from app.modules.products.schemas import ProductOut
+from bson import ObjectId
 
 
 router = APIRouter()

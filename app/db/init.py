@@ -10,6 +10,7 @@ from app.modules.reviews.model import Review
 from app.modules.auth.model import Role, Account
 from app.modules.shippers.model import Shipper
 from app.modules.shipments.model import Shipment
+from app.modules.brands.model import Brand
 
 async def init_db() -> None:
     client = AsyncIOMotorClient(settings.MONGODB_URI)
@@ -21,6 +22,7 @@ async def init_db() -> None:
             Product,
             Order,
             Category,
+            Brand,
             Review,
             Role,
             Account,

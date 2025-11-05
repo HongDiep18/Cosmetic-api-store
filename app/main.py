@@ -12,6 +12,7 @@ from app.modules.users.router import router as users_router
 from app.modules.products.routes import router as products_router
 from app.modules.orders.routes import router as orders_router
 from app.modules.categories.routes import router as categories_router
+from app.modules.brands.routes import router as brands_router
 from app.modules.reviews.routes import router as reviews_router
 from app.modules.shippers.routes import router as shippers_router
 
@@ -67,6 +68,7 @@ try:
     app.include_router(shipments_router, prefix="/api/shipments", tags=["shipments"])
     app.include_router(account_router, prefix="/api/accounts", tags=["Account"])
     app.include_router(payments_router, prefix="/api/payments", tags=["Payments"])
+    app.include_router(brands_router, prefix="/api/brands", tags=["Brands"])
 
 except Exception as e:
     print(f"❌ Error registering routers: {e}")
