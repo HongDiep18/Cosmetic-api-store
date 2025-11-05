@@ -68,15 +68,30 @@ async def list_shippers() -> list[Shipper]:
     return await Shipper.find_all().to_list()
 
 
+# async def update_shipper(shipper_id: str, data: ShipperUpdate) -> Shipper | None:
+#     shipper = await Shipper.get(shipper_id)
+#     if not shipper:
+#         return None
+
+#     if data.fullName is not None:
+#         shipper.fullName = data.fullName
+#     if data.phone is not None:
+#         shipper.phone = data.phone
+
+
+
+#     await shipper.save()
+#     return shipper
+
 async def update_shipper(shipper_id: str, data: ShipperUpdate) -> Shipper | None:
     shipper = await Shipper.get(shipper_id)
     if not shipper:
         return None
 
-    if data.fullName is not None:
-        shipper.fullName = data.fullName
-    if data.phone is not None:
-        shipper.phone = data.phone
+    if data.FullName is not None:
+        shipper.FullName = data.FullName
+    if data.Phone is not None:
+        shipper.Phone = data.Phone
 
 
 
