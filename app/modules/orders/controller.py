@@ -10,15 +10,10 @@ from fastapi import HTTPException, status
 from app.modules.products.model import Product  # Giả sử bạn có model Product để truy vấn sản phẩm
 async def create_order(user_id: str, data: OrderCreate) -> Order:
     try:
+        from beanie import PydanticObjectId
         
         items = []
         for item in data.Items:
-            
-            # product = await Product.find_one(Product.ProductName == item.ProductName)
-            # if product is None:
-            #     print(f"Không tìm thấy sản phẩm: {item['ProductName']}")
-            #     continue
-
             items.append(
                 OrderItem(
                     ProductID=item.ProductID,
@@ -30,10 +25,14 @@ async def create_order(user_id: str, data: OrderCreate) -> Order:
         total_amount = sum(item.Price * item.Quantity for item in items)
         now = datetime.utcnow()
 
-
+        # Convert user_id to PydanticObjectId
+        try:
+            user_oid = PydanticObjectId(user_id)
+        except Exception:
+            user_oid = user_id  # Fallback to string if conversion fails
     
         order = Order(
-            UserID=user_id, # Convert chỉ user_id
+            UserID=user_oid,
             Items=items,
             TotalAmount=total_amount,
             ShippingAddress=data.ShippingAddress,
@@ -43,6 +42,7 @@ async def create_order(user_id: str, data: OrderCreate) -> Order:
             UpdatedAt=now,
         )
         await order.insert()
+        print(f"✅ Created order for user_id={user_id} (oid={user_oid}), order_id={order.OrderID}")
         return order
 
     except Exception as e:
@@ -53,8 +53,23 @@ async def create_order(user_id: str, data: OrderCreate) -> Order:
 
 async def get_user_orders(user_id: str) -> List[Order]:
     try:
-        # Find orders with exact user_id string match
-        orders = await Order.find({"UserID": user_id}).sort("-CreatedAt").to_list()
+        # Convert string user_id to PydanticObjectId for query
+        from beanie import PydanticObjectId
+        try:
+            user_oid = PydanticObjectId(user_id)
+        except Exception:
+            # If user_id is not a valid ObjectId, try to find by string
+            user_oid = user_id
+        
+        # Find orders with UserID matching (handles both ObjectId and string)
+        orders = await Order.find(
+            {"$or": [
+                {"UserID": user_oid},
+                {"UserID": user_id}
+            ]}
+        ).sort("-CreatedAt").to_list()
+
+        print(f"🔍 get_user_orders: user_id={user_id}, found {len(orders)} orders")
 
         # Ensure each order's _id is converted to string
         for order in orders:
@@ -63,6 +78,7 @@ async def get_user_orders(user_id: str) -> List[Order]:
 
         return orders
     except Exception as e:
+        print(f"❌ Error in get_user_orders: {e}")
         raise Exception(f"Error fetching user orders: {str(e)}")
 
 
@@ -350,102 +366,3 @@ async def get_best_selling_products_in_month(
     return results
 
 
-from models.user import User
-# ====== Lấy danh sách tất cả đơn hàng ======
-async def get_all_orders() -> List[Dict[str, Any]]:
-    """
-    Lấy danh sách đơn hàng, bao gồm:
-    - Mã đơn hàng (_id)
-    - Tên khách hàng (FullName)
-    - Ngày tạo (OrderDate)
-    - Tổng tiền (TotalAmount)
-    - Số sản phẩm (tổng Quantity trong Items)
-    - Trạng thái (Status)
-    """
-
-    pipeline = [
-        {
-            "$lookup": {
-                "from": "users",
-                "localField": "UserID",
-                "foreignField": "_id",
-                "as": "UserInfo",
-            }
-        },
-        {"$unwind": {"path": "$UserInfo", "preserveNullAndEmptyArrays": True}},
-        {
-            "$project": {
-                "_id": 1,
-                "customer_name": "$UserInfo.FullName",
-                "order_date": "$OrderDate",
-                "total_amount": "$TotalAmount",
-                "status": "$Status",
-                "total_items": {"$sum": "$Items.Quantity"},
-            }
-        },
-        {"$sort": {"order_date": -1}},
-    ]
-
-    results = await Order.aggregate(pipeline).to_list(None)
-    return results
-
-
-# ====== Lấy chi tiết 1 đơn hàng ======
-async def get_order_details(order_id: str) -> Dict[str, Any]:
-    """
-    Lấy thông tin chi tiết của một đơn hàng theo ID:
-    - Mã đơn hàng
-    - Tên khách hàng
-    - Danh sách sản phẩm, số lượng, giá
-    - Tổng tiền
-    - Ngày đặt
-    """
-    try:
-        object_id = ObjectId(order_id)
-    except:
-        raise HTTPException(status_code=400, detail="Mã đơn hàng không hợp lệ")
-
-    pipeline = [
-        {"$match": {"_id": object_id}},
-        {
-            "$lookup": {
-                "from": "users",
-                "localField": "UserID",
-                "foreignField": "_id",
-                "as": "UserInfo",
-            }
-        },
-        {"$unwind": {"path": "$UserInfo", "preserveNullAndEmptyArrays": True}},
-        {"$unwind": "$Items"},
-        {
-            "$lookup": {
-                "from": "products",
-                "localField": "Items.ProductID",
-                "foreignField": "_id",
-                "as": "ProductInfo",
-            }
-        },
-        {"$unwind": {"path": "$ProductInfo", "preserveNullAndEmptyArrays": True}},
-        {
-            "$group": {
-                "_id": "$_id",
-                "customer_name": {"$first": "$UserInfo.FullName"},
-                "order_date": {"$first": "$OrderDate"},
-                "total_amount": {"$first": "$TotalAmount"},
-                "status": {"$first": "$Status"},
-                "items": {
-                    "$push": {
-                        "product_name": "$ProductInfo.ProductName",
-                        "quantity": "$Items.Quantity",
-                        "price": "$Items.Price",
-                    }
-                },
-            }
-        },
-    ]
-
-    result = await Order.aggregate(pipeline).to_list(None)
-    if not result:
-        raise HTTPException(status_code=404, detail="Không tìm thấy đơn hàng")
-
-    return result[0]

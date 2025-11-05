@@ -4,6 +4,7 @@ from fastapi.params import Query
 from app.core.deps import require_admin_account, get_current_account
 from app.modules.orders.schemas import OrderCreate, OrderOut
 from app.modules.users.model import User
+from app.modules.auth.model import Account
 from app.modules.orders.controller import (
     create_order,
     get_user_orders,
@@ -16,8 +17,6 @@ from app.modules.orders.controller import (
     get_today_pending_orders_count,
     get_monthly_revenue,
     get_best_selling_products_in_month,
-    get_all_orders,
-    get_order_by_id
 )
 
 
@@ -48,14 +47,23 @@ router = APIRouter()
 @router.post("", response_model=OrderOut, status_code=status.HTTP_201_CREATED)
 async def create_order_endpoint(
     data: OrderCreate,
-    current_user: User = Depends(get_current_account)
+    current_account: Account = Depends(get_current_account)
 ):
     try:
-        order = await create_order(user_id=str(current_user.id), data=data)
+        # Tìm User từ AccountID
+        user = await User.find_one(User.AccountID == current_account.AccountID)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+            )
+        
+        order = await create_order(user_id=str(user.UserID), data=data)
         return OrderOut.model_validate(order, from_attributes=True)
 
     except ValueError as ve:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
@@ -63,21 +71,37 @@ async def create_order_endpoint(
 
 
 
-# get 1 order - user view order of them
+# get orders of current user
 @router.get("/get-order", response_model=list[OrderOut])
 async def get_my_orders(
-    # current_user: User = Depends(get_current_account)
+    current_account: Account = Depends(get_current_account)
 ):
     try:
-        test_user_id = "7027bdf6-be3d-42a9-8ed3-9ecc8a41ca45"
-        orders = await get_user_orders(user_id=test_user_id)
-        # orders = await get_user_orders(user_id=current_user)
-
-        if not orders:
+        # Tìm User từ AccountID
+        user = await User.find_one(User.AccountID == current_account.AccountID)
+        if not user:
+            print(f"⚠️ User not found for AccountID={current_account.AccountID}")
             return []
 
-        return [OrderOut.model_validate(o, from_attributes=True) for o in orders]
+        user_id_str = str(user.UserID)
+        print(f"🔍 Looking for orders with UserID={user_id_str}")
+        orders = await get_user_orders(user_id=user_id_str)
+
+        if not orders:
+            print(f"⚠️ No orders found for UserID={user_id_str}")
+            return []
+
+        print(f"✅ Found {len(orders)} orders for UserID={user_id_str}")
+        results = []
+        for o in orders:
+            try:
+                results.append(OrderOut.model_validate(o, from_attributes=True))
+            except Exception as e:
+                print(f"⚠️ model_validate from_attributes=True failed: {e}. Retrying with from_attributes=False")
+                results.append(OrderOut.model_validate(o, from_attributes=False))
+        return results
     except Exception as e:
+        print(f"❌ Error in get_my_orders: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error retrieving orders: {str(e)}",
@@ -206,15 +230,6 @@ async def best_selling_products_endpoint(
     products = await get_best_selling_products_in_month(year, month)
     return {"best_selling_products": products}
 
-# ======= Danh sách đơn hàng =======
-@router.get("/")
-async def list_orders():
-    orders = await get_all_orders()
-    return {"orders": orders}
 
 
-# ======= Chi tiết 1 đơn hàng =======
-@router.get("/{order_id}")
-async def order_details(order_id: str):
-    order = await get_order_details(order_id)
-    return {"order": order}
+
