@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Optional
 from datetime import datetime
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator
 from bson import ObjectId
 
 
@@ -23,6 +23,11 @@ class ProductBase(BaseModel):
         # Chuyển đổi ObjectId sang string nếu cần
         if isinstance(v, ObjectId):
             return str(v)
+        if isinstance(v, str):
+            raw = v.strip().strip('"').strip("'")
+            if raw.lower() in {"undefined", "null", ""}:
+                raise ValueError("CategoryID is required")
+            return raw
         return v
     
     Rating: Optional[float] = Field(default=0.0, ge=0, le=5)
@@ -53,44 +58,19 @@ class ProductUpdate(BaseModel):
 
 
 class ProductOut(ProductBase):
-    ProductID: str
+    id: str = Field(alias="_id")
     CreatedAt: datetime
     UpdatedAt: datetime
 
     class Config:
         from_attributes = True
+        populate_by_name = True
 
-    @model_validator(mode="before")
-    @classmethod
-    def ensure_product_id(cls, data):
-        if isinstance(data, dict):
-            if not data.get("ProductID") and data.get("id"):
-                data["ProductID"] = str(data["id"])
-            return data
-        if hasattr(data, 'model_dump'):
-            data_dict = data.model_dump()
-            if not data_dict.get("ProductID"):
-                if hasattr(data, 'id') and data.id:
-                    data_dict["ProductID"] = str(data.id)
-                elif hasattr(data, '_id') and data._id:
-                    data_dict["ProductID"] = str(data._id)
-            return data_dict
-        if hasattr(data, 'ProductID'):
-            return data
-        if hasattr(data, 'id') and data.id:
-            result = {}
-            if hasattr(data, '__dict__'):
-                result.update(data.__dict__)
-            result["ProductID"] = str(data.id)
-            return result
-        
-        return data
-    
-    @field_validator("ProductID", mode="before")
+    @field_validator("id", mode="before")
     @classmethod
     def cast_id(cls, v):
         if v is None:
-            raise ValueError("ProductID is None")
+            raise ValueError("id is None")
         return str(v)
 
 
