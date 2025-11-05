@@ -1,21 +1,24 @@
 from beanie import init_beanie as beanie_init
 from motor.motor_asyncio import AsyncIOMotorClient
-
 from app.core.config import settings
-from app.modules.users.model import User
-from app.modules.products.model import Product
-from app.modules.orders.model import Order
-from app.modules.categories.model import Category
-from app.modules.reviews.model import Review
-from app.modules.auth.model import Role, Account
-from app.modules.shippers.model import Shipper
-from app.modules.shipments.model import Shipment
-from app.modules.brands.model import Brand
-from app.modules.payments.model import Payment
+
+# Tạo client và db instance
+client = AsyncIOMotorClient(settings.MONGODB_URI)
+db = client[settings.MONGODB_DB]
+
 
 async def init_db() -> None:
-    client = AsyncIOMotorClient(settings.MONGODB_URI)
-    db = client[settings.MONGODB_DB]
+    # Import models ở đây để tránh circular import
+    from app.modules.users.model import User
+    from app.modules.products.model import Product
+    from app.modules.orders.model import Order
+    from app.modules.categories.model import Category
+    from app.modules.reviews.model import Review
+    from app.modules.auth.model import Role, Account
+    from app.modules.shippers.model import Shipper
+    from app.modules.shipments.model import Shipment
+    from app.modules.brands.model import Brand
+
     await beanie_init(
         database=db,
         document_models=[
@@ -29,9 +32,5 @@ async def init_db() -> None:
             Account,
             Shipper,
             Shipment,
-            Payment
         ],
     )
-
- 
-

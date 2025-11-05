@@ -1,39 +1,10 @@
 from __future__ import annotations
-from typing import Optional
+from typing import List, Optional
 from datetime import datetime
-from pydantic import BaseModel,EmailStr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from beanie import PydanticObjectId
 
-# class ShipperBase(BaseModel):
-#     # Use the same attribute names as the Beanie Document (fullName, phone)
-#     fullName: str = Field(min_length=1)
-#     phone: str = Field(min_length=1)
 
-
-# class ShipperCreate(ShipperBase):
-#     pass
-
-
-# class ShipperUpdate(BaseModel):
-#     fullName: Optional[str] = None
-#     phone: Optional[str] = None
-
-
-# class ShipperOut(ShipperBase):
-#     id: str = Field(alias="_id")
-#     CreatedAt: datetime
-#     UpdatedAt: datetime
-
-#     class Config:
-#         from_attributes = True
-#         populate_by_name = True
-
-#     @field_validator("id", mode="before")
-#     @classmethod
-#     def cast_id(cls, v):
-#         return str(v) if v else None
-
-# ========================================KHANG===========
 class ShipperBase(BaseModel):
     AccountID: Optional[PydanticObjectId]
     FullName: str = Field(min_length=1)
@@ -51,13 +22,14 @@ class ShipperCreate(BaseModel):
         "extra": "ignore",
     }
 
+
 class ShipperUpdate(BaseModel):
     FullName: Optional[str] = None
     Phone: Optional[str] = None
 
 
 class ShipperOut(ShipperBase):
-    ShipperID:  Optional[PydanticObjectId]
+    ShipperID: Optional[PydanticObjectId]
     CreatedAt: datetime
     UpdatedAt: datetime
 
@@ -68,3 +40,53 @@ class ShipperOut(ShipperBase):
     @classmethod
     def cast_id(cls, v):
         return str(v) if v else None
+
+
+class OrderItemDetail(BaseModel):
+    ProductID: str
+    ProductName: str
+    Quantity: int
+    Price: float
+
+
+class DeliverySummaryOut(BaseModel):
+    """Schema for summarized delivery information shown in list view"""
+
+    ShipmentID: str = Field(description="ID của vận đơn")
+    TrackingNumber: str = Field(description="Mã vận đơn (VD: VD001-2024)")
+    CustomerName: str = Field(description="Tên khách hàng")
+    ShippingAddress: str = Field(description="Địa chỉ giao hàng")
+    CODAmount: float = Field(description="Số tiền thu hộ (0 nếu đã thanh toán)")
+    Status: str = Field(description="Trạng thái vận đơn")
+
+    class Config:
+        from_attributes = True
+
+
+class DeliveryDetailsOut(BaseModel):
+    # Shipment info
+    TrackingNumber: str
+    ShipmentStatus: str
+
+    # Order info
+    OrderID: str
+    ShippingAddress: str
+    TotalAmount: float
+    OrderStatus: str
+
+    # Customer info
+    CustomerName: str
+    CustomerPhone: str
+
+    # Items
+    Items: List[OrderItemDetail]
+
+    # Payment info
+    CODAmount: float = Field(
+        description="Amount to collect (0 if paid online or already paid)"
+    )
+    PaymentMethod: str
+    PaymentStatus: str
+
+    class Config:
+        from_attributes = True

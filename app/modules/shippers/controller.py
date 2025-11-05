@@ -1,7 +1,7 @@
 from app.modules.shippers.model import Shipper
 from app.modules.shippers.schemas import ShipperCreate, ShipperUpdate
 from app.modules.auth.model import Account, Role
-from fastapi import HTTPException, status
+from fastapi import HTTPException
 from app.modules.auth.controller import get_password_hash
 
 
@@ -13,6 +13,7 @@ async def create_shipper(data: ShipperCreate) -> Shipper:
     await shipper.insert()
     return shipper
 
+
 async def create_account_shipper(data: ShipperCreate):
     email = data.Email.strip().lower()
     print(f"📩 Register new shipper\n\n\n: {email}")
@@ -21,7 +22,7 @@ async def create_account_shipper(data: ShipperCreate):
     existing = await Account.find_one({"Email": email})
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
-    
+
     # Lấy role mặc định
     default_role = await Role.find_one({"RoleName": "Shipper"})
     if not default_role:
@@ -44,7 +45,6 @@ async def create_account_shipper(data: ShipperCreate):
         Phone=data.Phone,
     )
     await shipper.insert()
-    
 
     shipper_dict = {
         "AccountID": str(account.id),
@@ -68,21 +68,6 @@ async def list_shippers() -> list[Shipper]:
     return await Shipper.find_all().to_list()
 
 
-# async def update_shipper(shipper_id: str, data: ShipperUpdate) -> Shipper | None:
-#     shipper = await Shipper.get(shipper_id)
-#     if not shipper:
-#         return None
-
-#     if data.fullName is not None:
-#         shipper.fullName = data.fullName
-#     if data.phone is not None:
-#         shipper.phone = data.phone
-
-
-
-#     await shipper.save()
-#     return shipper
-
 async def update_shipper(shipper_id: str, data: ShipperUpdate) -> Shipper | None:
     shipper = await Shipper.get(shipper_id)
     if not shipper:
@@ -92,8 +77,6 @@ async def update_shipper(shipper_id: str, data: ShipperUpdate) -> Shipper | None
         shipper.FullName = data.FullName
     if data.Phone is not None:
         shipper.Phone = data.Phone
-
-
 
     await shipper.save()
     return shipper
