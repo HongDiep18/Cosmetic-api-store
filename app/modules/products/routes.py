@@ -7,13 +7,16 @@ from fastapi import (
     status,
     UploadFile,
     File,
+
 )
+
+from beanie import Document, Indexed, PydanticObjectId
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.core.deps import require_admin_account
 from app.modules.products.model import Product
-from app.modules.products.schemas import ProductCreate, ProductOut, ProductUpdate, PaginatedResponse
+from app.modules.products.schemas import ProductCreate, ProductOut, ProductUpdate, PaginatedResponse, StockUpdateRequest
 from app.modules.products.utils import save_upload_file
 from app.modules.products.controller import (
     create_product,
@@ -230,3 +233,16 @@ async def get_product_detail_endpoint(product_id: str):
     if not product_detail:
         raise HTTPException(status_code=404, detail="Product not found")
     return product_detail
+
+
+# Cập nhật số lượng tồn kho
+@router.put("/{product_id}/stock")
+async def update_stock(product_id: str, data: StockUpdateRequest):
+    product = await Product.get(PydanticObjectId(product_id))
+    if not product:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+
+    product.Stock = data.quantity
+    await product.save()
+
+    return {"message": "Cập nhật tồn kho thành công"}

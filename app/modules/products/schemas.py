@@ -80,3 +80,9 @@ class PaginatedResponse(BaseModel):
     page: int
     limit: int
     totalPages: int
+
+
+
+    
+class StockUpdateRequest(BaseModel):
+    quantity: int = Field(..., ge=0, description="Số lượng tồn kho mới")
