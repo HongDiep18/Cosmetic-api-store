@@ -16,8 +16,6 @@ from app.modules.orders.controller import (
     get_today_pending_orders_count,
     get_monthly_revenue,
     get_best_selling_products_in_month,
-    get_all_orders,
-    get_order_by_id
 )
 
 
@@ -206,15 +204,6 @@ async def best_selling_products_endpoint(
     products = await get_best_selling_products_in_month(year, month)
     return {"best_selling_products": products}
 
-# ======= Danh sách đơn hàng =======
-@router.get("/")
-async def list_orders():
-    orders = await get_all_orders()
-    return {"orders": orders}
 
 
-# ======= Chi tiết 1 đơn hàng =======
-@router.get("/{order_id}")
-async def order_details(order_id: str):
-    order = await get_order_details(order_id)
-    return {"order": order}
+
