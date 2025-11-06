@@ -4,7 +4,7 @@ from beanie import Document, PydanticObjectId
 from pydantic import BaseModel, Field
 from bson import ObjectId
 from .schemas import OrderStatus
-from typing import Optional
+from typing import Optional, Union
 
 # class OrderItem(BaseModel):
 #     ProductID: str
@@ -44,24 +44,22 @@ from typing import Optional
 #         return await super().save(*args, **kwargs)
 
 
+
 class OrderItem(BaseModel):
-    ProductID: str
-    # ProductID: Optional[PydanticObjectId]
+    ProductID: Union[str, PydanticObjectId]
+    # ProductID: Optional[PydanticObjectId] 
     Quantity: int = Field(ge=1)
     Price: float = Field(ge=0)
-
+    
     model_config = {
         "json_encoders": {
             ObjectId: str,
-            PydanticObjectId: str,  # Khi serialize ra JSON, ObjectId → string
+            PydanticObjectId: str  # Khi serialize ra JSON, ObjectId → string
         }
     }
-
-
+    
 class Order(Document):
-    OrderID: Optional[PydanticObjectId] = Field(
-        default_factory=PydanticObjectId, alias="_id"
-    )
+    OrderID: Optional[PydanticObjectId] = Field(default_factory=PydanticObjectId, alias="_id")
     UserID: Optional[PydanticObjectId]
     ShippingAddress: str
     OrderDate: datetime = Field(default_factory=datetime.utcnow)
