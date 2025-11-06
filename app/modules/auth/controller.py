@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from typing import Tuple, Optional
+from typing import Tuple
 from fastapi import HTTPException
 from jose import jwt
 from passlib.context import CryptContext
@@ -8,7 +8,6 @@ import secrets
 from app.core.config import settings
 from app.modules.auth.model import Account, Role
 from app.modules.users.model import User
-from app.modules.shippers.model import Shipper
 
 # ==============================
 # 🔐 Cấu hình mật khẩu & JWT
@@ -46,7 +45,7 @@ def create_login_token(account: Account, role_name: str) -> str:
 # ==============================
 # 👤 AUTHENTICATION
 # ==============================
-async def authenticate_user(Email: str, Password: str) -> Tuple[Account,  Optional[User]]:
+async def authenticate_user(Email: str, Password: str) -> Tuple[Account, User]:
     """Đăng nhập người dùng bằng email + password"""
     email = Email.strip().lower()
     print(f"📧 [AUTH] Finding account with email: {email}")
@@ -60,24 +59,19 @@ async def authenticate_user(Email: str, Password: str) -> Tuple[Account,  Option
 
     # 🔧 Dùng account.id (Mongo _id) chứ không phải account.AccountID
     user = await User.find_one({"AccountID": account.id})
-    
-    shipper = await Shipper.find_one({"AccountID": account.id})
-    
-     # ❌ Nếu không có cả user lẫn shipper → lỗi
-    if not user and not shipper:
+    if not user:
         raise HTTPException(status_code=404, detail="User profile not found")
 
-    # ✅ Ưu tiên return theo loại tài khoản
-    profile = user if user else shipper
-
-    print(f"✅ Authenticated user: {profile.FullName}")
-    return account, profile
+    print(f" Authenticated user: {user.FullName}")
+    return account, user
 
 
 # ==============================
 # 🧾 REGISTER
 # ==============================
-async def register_user(Email: str, Password: str, FullName: str, Phone: str, Address: str):
+async def register_user(
+    Email: str, Password: str, FullName: str, Phone: str, Address: str
+):
     """Đăng ký tài khoản mới"""
     email = Email.strip().lower()
     print(f"📩 Register new user: {email}")
