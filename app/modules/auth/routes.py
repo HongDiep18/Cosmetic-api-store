@@ -24,7 +24,7 @@ from app.modules.auth.controller import (
     reset_password,
     set_account_role,
     set_account_status,
-    create_login_token
+    create_login_token,
 )
 from app.modules.users.schemas import UserOut, UserWithEmailOut
 from app.modules.auth.model import Account, Role
@@ -79,10 +79,12 @@ async def register(data: RegisterRequest):
 
 @router.post("/login")
 async def login_for_access_token(payload: LoginRequest):
-    
     print("📩 Raw payload:", payload)
 
-    account, user,  = await authenticate_user(payload.Email, payload.Password)
+    (
+        account,
+        user,
+    ) = await authenticate_user(payload.Email, payload.Password)
 
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
@@ -123,7 +125,6 @@ async def refresh_token(_: RefreshTokenRequest):
 
 @router.get("/me", response_model=UserWithEmailOut)
 async def read_me(current_account: Account = Depends(get_current_account)):
-
     user = await User.find_one(User.AccountID == ObjectId(current_account.id))
 
     if not user:
@@ -235,6 +236,7 @@ async def update_account_status(account_id: str, payload: dict):
         raise HTTPException(status_code=404, detail="Account not found")
 
     return AccountOut.model_validate(account.model_dump())
+
 
 @router.patch(
     "/accounts/{account_id}/role",
