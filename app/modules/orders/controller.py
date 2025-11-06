@@ -150,6 +150,66 @@ async def get_order_status_summary():
     summary = {r["_id"]: r["count"] for r in results}
     return summary
 
+# ====== Lấy chi tiết 1 đơn hàng ======
+async def get_order_details(order_id: str) -> Dict[str, Any]:
+    """
+    Lấy thông tin chi tiết của một đơn hàng theo ID:
+    - Mã đơn hàng
+    - Tên khách hàng
+    - Danh sách sản phẩm, số lượng, giá
+    - Tổng tiền
+    - Ngày đặt
+    """
+    try:
+        object_id = ObjectId(order_id)
+    except:
+        raise HTTPException(status_code=400, detail="Mã đơn hàng không hợp lệ")
+
+    pipeline = [
+        {"$match": {"_id": object_id}},
+        {
+            "$lookup": {
+                "from": "users",
+                "localField": "UserID",
+                "foreignField": "_id",
+                "as": "UserInfo",
+            }
+        },
+        {"$unwind": {"path": "$UserInfo", "preserveNullAndEmptyArrays": True}},
+        {"$unwind": "$Items"},
+        {
+            "$lookup": {
+                "from": "products",
+                "localField": "Items.ProductID",
+                "foreignField": "_id",
+                "as": "ProductInfo",
+            }
+        },
+        {"$unwind": {"path": "$ProductInfo", "preserveNullAndEmptyArrays": True}},
+        {
+            "$group": {
+                "_id": "$_id",
+                "customer_name": {"$first": "$UserInfo.FullName"},
+                "order_date": {"$first": "$OrderDate"},
+                "total_amount": {"$first": "$TotalAmount"},
+                "status": {"$first": "$Status"},
+                "items": {
+                    "$push": {
+                        "product_name": "$ProductInfo.ProductName",
+                        "quantity": "$Items.Quantity",
+                        "price": "$Items.Price",
+                    }
+                },
+            }
+        },
+    ]
+
+    result = await Order.aggregate(pipeline).to_list(None)
+    if not result:
+        raise HTTPException(status_code=404, detail="Không tìm thấy đơn hàng")
+
+    return result[0]
+
 # lấy doanh thu 7 ngày gần nhất
 async def get_last_7_days_total_revenue() -> list[dict]:
     """
