@@ -1,19 +1,33 @@
-from __future__ import annotations
-from typing import List, Optional
-from app.modules.orders.model import Order, OrderItem
-from app.modules.orders.schemas import OrderCreate
+from typing import Dict, List, Optional
 from datetime import datetime, timedelta
-from typing import Dict
 from bson.son import SON
 from beanie import PydanticObjectId
 from fastapi import HTTPException, status
-from app.modules.products.model import Product  # Giả sử bạn có model Product để truy vấn sản phẩm
+
+from app.modules.orders.model import Order, OrderItem
+from app.modules.orders.schemas import OrderCreate
+
+# Valid order status transitions
+VALID_STATUS_TRANSITIONS: Dict[str, List[str]] = {
+    "Pending": ["Confirmed", "Cancelled"],
+    "Confirmed": ["Processing", "Cancelled"],
+    "Processing": ["Shipped", "Cancelled"],
+    "Shipped": ["Delivered", "Failed"],
+    "Delivered": [],  # Final state
+    "Failed": ["Pending"],  # Can retry delivery
+    "Cancelled": [],  # Final state
+}
+
+
 async def create_order(user_id: str, data: OrderCreate) -> Order:
     try:
-        from beanie import PydanticObjectId
-        
         items = []
         for item in data.Items:
+            # product = await Product.find_one(Product.ProductName == item.ProductName)
+            # if product is None:
+            #     print(f"Không tìm thấy sản phẩm: {item['ProductName']}")
+            #     continue
+
             items.append(
                 OrderItem(
                     ProductID=item.ProductID,
@@ -25,14 +39,8 @@ async def create_order(user_id: str, data: OrderCreate) -> Order:
         total_amount = sum(item.Price * item.Quantity for item in items)
         now = datetime.utcnow()
 
-        # Convert user_id to PydanticObjectId
-        try:
-            user_oid = PydanticObjectId(user_id)
-        except Exception:
-            user_oid = user_id  # Fallback to string if conversion fails
-    
         order = Order(
-            UserID=user_oid,
+            UserID=user_id,  # Convert chỉ user_id
             Items=items,
             TotalAmount=total_amount,
             ShippingAddress=data.ShippingAddress,
@@ -42,7 +50,6 @@ async def create_order(user_id: str, data: OrderCreate) -> Order:
             UpdatedAt=now,
         )
         await order.insert()
-        print(f"✅ Created order for user_id={user_id} (oid={user_oid}), order_id={order.OrderID}")
         return order
 
     except Exception as e:
@@ -53,23 +60,8 @@ async def create_order(user_id: str, data: OrderCreate) -> Order:
 
 async def get_user_orders(user_id: str) -> List[Order]:
     try:
-        # Convert string user_id to PydanticObjectId for query
-        from beanie import PydanticObjectId
-        try:
-            user_oid = PydanticObjectId(user_id)
-        except Exception:
-            # If user_id is not a valid ObjectId, try to find by string
-            user_oid = user_id
-        
-        # Find orders with UserID matching (handles both ObjectId and string)
-        orders = await Order.find(
-            {"$or": [
-                {"UserID": user_oid},
-                {"UserID": user_id}
-            ]}
-        ).sort("-CreatedAt").to_list()
-
-        print(f"🔍 get_user_orders: user_id={user_id}, found {len(orders)} orders")
+        # Find orders with exact user_id string match
+        orders = await Order.find({"UserID": user_id}).sort("-CreatedAt").to_list()
 
         # Ensure each order's _id is converted to string
         for order in orders:
@@ -78,7 +70,6 @@ async def get_user_orders(user_id: str) -> List[Order]:
 
         return orders
     except Exception as e:
-        print(f"❌ Error in get_user_orders: {e}")
         raise Exception(f"Error fetching user orders: {str(e)}")
 
 
@@ -116,13 +107,68 @@ async def list_all_orders() -> List[Order]:
         return []
 
 
-async def update_order_status(order_id: str, status: str) -> Optional[Order]:
-    order = await Order.get(order_id)
-    if not order:
-        return None
-    order.Status = status
-    await order.save()
-    return order
+async def update_order_status(order_id: str, new_status: str) -> Optional[Order]:
+    """
+    Cập nhật trạng thái đơn hàng với xác thực chuyển đổi trạng thái.
+
+    Args:
+        order_id: ID của đơn hàng cần cập nhật
+        new_status: Trạng thái mới muốn chuyển đến
+
+    Returns:
+        Updated Order object hoặc None nếu không tìm thấy đơn hàng
+
+    Raises:
+        HTTPException: Nếu chuyển đổi trạng thái không hợp lệ
+    """
+    try:
+        # # Bước 1: Kiểm tra trạng thái mới có nằm trong danh sách trạng thái hợp lệ không
+        # # Ví dụ: new_status phải là một trong các giá trị: Pending, Confirmed, Processing, etc.
+        # if new_status not in VALID_STATUS_TRANSITIONS:
+        #     raise HTTPException(
+        #         status_code=status.HTTP_400_BAD_REQUEST,
+        #         detail=f"Trạng thái không hợp lệ. Phải là một trong các giá trị: {', '.join(VALID_STATUS_TRANSITIONS.keys())}",
+        #     )
+
+        # Bước 2: Lấy thông tin đơn hàng từ database
+        order = await Order.get(PydanticObjectId(order_id))
+        if not order:
+            return None
+
+        current_status = order.Status
+
+        # # Bước 3: Kiểm tra trạng thái hiện tại có hợp lệ không
+        # # Ví dụ: current_status phải là một trạng thái đã định nghĩa
+        # if current_status not in VALID_STATUS_TRANSITIONS:
+        #     raise HTTPException(
+        #         status_code=status.HTTP_400_BAD_REQUEST,
+        #         detail=f"Trạng thái hiện tại '{current_status}' không hợp lệ",
+        #     )
+
+        # # Bước 4: Kiểm tra xem có được phép chuyển từ trạng thái hiện tại sang trạng thái mới không
+        # # Ví dụ: Pending chỉ có thể chuyển sang Confirmed hoặc Cancelled
+        # allowed_transitions = VALID_STATUS_TRANSITIONS[current_status]
+        # if new_status not in allowed_transitions:
+        #     raise HTTPException(
+        #         status_code=status.HTTP_400_BAD_REQUEST,
+        #         detail=f"Không thể chuyển từ '{current_status}' sang '{new_status}'. Chỉ có thể chuyển sang: {', '.join(allowed_transitions)}",
+        #     )
+
+        # Update the order
+        order.Status = new_status
+        order.UpdatedAt = datetime.utcnow()
+        await order.save()
+
+        return order
+
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        print(f"❌ Error updating order status: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error updating order status: {str(e)}",
+        )
 
 
 # get status summary
@@ -135,80 +181,19 @@ async def get_order_status_summary():
         {
             "$match": {
                 "Status": {"$ne": None},
-                "CreatedAt": {"$gte": today, "$lt": tomorrow}  # chỉ lấy đơn của hôm nay
+                "CreatedAt": {
+                    "$gte": today,
+                    "$lt": tomorrow,
+                },  # chỉ lấy đơn của hôm nay
             }
         },
-        {
-            "$group": {
-                "_id": "$Status",
-                "count": {"$sum": 1}
-            }
-        }
+        {"$group": {"_id": "$Status", "count": {"$sum": 1}}},
     ]
 
     results = await Order.aggregate(pipeline).to_list(None)
     summary = {r["_id"]: r["count"] for r in results}
     return summary
 
-# # ====== Lấy chi tiết 1 đơn hàng ======
-# async def get_order_details(order_id: str) -> Dict[str, Any]:
-#     """
-#     Lấy thông tin chi tiết của một đơn hàng theo ID:
-#     - Mã đơn hàng
-#     - Tên khách hàng
-#     - Danh sách sản phẩm, số lượng, giá
-#     - Tổng tiền
-#     - Ngày đặt
-#     """
-#     try:
-#         object_id = ObjectId(order_id)
-#     except:
-#         raise HTTPException(status_code=400, detail="Mã đơn hàng không hợp lệ")
-
-#     pipeline = [
-#         {"$match": {"_id": object_id}},
-#         {
-#             "$lookup": {
-#                 "from": "users",
-#                 "localField": "UserID",
-#                 "foreignField": "_id",
-#                 "as": "UserInfo",
-#             }
-#         },
-#         {"$unwind": {"path": "$UserInfo", "preserveNullAndEmptyArrays": True}},
-#         {"$unwind": "$Items"},
-#         {
-#             "$lookup": {
-#                 "from": "products",
-#                 "localField": "Items.ProductID",
-#                 "foreignField": "_id",
-#                 "as": "ProductInfo",
-#             }
-#         },
-#         {"$unwind": {"path": "$ProductInfo", "preserveNullAndEmptyArrays": True}},
-#         {
-#             "$group": {
-#                 "_id": "$_id",
-#                 "customer_name": {"$first": "$UserInfo.FullName"},
-#                 "order_date": {"$first": "$OrderDate"},
-#                 "total_amount": {"$first": "$TotalAmount"},
-#                 "status": {"$first": "$Status"},
-#                 "items": {
-#                     "$push": {
-#                         "product_name": "$ProductInfo.ProductName",
-#                         "quantity": "$Items.Quantity",
-#                         "price": "$Items.Price",
-#                     }
-#                 },
-#             }
-#         },
-#     ]
-
-#     result = await Order.aggregate(pipeline).to_list(None)
-#     if not result:
-#         raise HTTPException(status_code=404, detail="Không tìm thấy đơn hàng")
-
-#     return result[0]
 
 # lấy doanh thu 7 ngày gần nhất
 async def get_last_7_days_total_revenue() -> list[dict]:
@@ -259,7 +244,8 @@ async def get_last_7_days_total_revenue() -> list[dict]:
 
     return daily_revenue
 
-# lấy doanh thu từng ngày 
+
+# lấy doanh thu từng ngày
 # Hàm lấy doanh thu của 1 ngày cụ thể
 async def get_revenue_by_date(date: str) -> dict:
     """
@@ -287,6 +273,7 @@ async def get_revenue_by_date(date: str) -> dict:
     except Exception as e:
         # Nếu lỗi (ví dụ sai định dạng ngày)
         return {"date": date, "revenue": 0, "error": str(e)}
+
 
 # Get today's total revenue
 async def get_today_total_revenue() -> float:
@@ -426,3 +413,28 @@ async def get_best_selling_products_in_month(
     return results
 
 
+# Trang
+# lấy thông tin đơn hàng
+async def get_order_summaries() -> list[dict]:
+    """
+    Lấy thông tin đơn hàng gồm ID, địa chỉ, ngày đặt, tổng số lượng và tổng tiền.
+    """
+    pipeline = [
+        {
+            "$project": {
+                "_id": 1,
+                "ShippingAddress": 1,
+                "OrderDate": 1,
+                "TotalAmount": 1,
+                "Status": 1,
+                "TotalQuantity": {"$sum": "$Items.Quantity"},
+            }
+        },
+        {"$sort": {"OrderDate": -1}},
+    ]
+
+    results = await Order.aggregate(pipeline).to_list(None)
+    # Chuyển _id sang string cho dễ đọc
+    for r in results:
+        r["_id"] = str(r["_id"])
+    return results
