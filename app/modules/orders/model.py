@@ -50,7 +50,7 @@ from typing import Optional, Any
 class OrderItem(BaseModel):
 
     # Allow both string and ObjectId-like values (from older data)
-    ProductID: Any
+    ProductID: Optional[PydanticObjectId]
     Quantity: int = Field(ge=1)
     Price: float = Field(ge=0)
     

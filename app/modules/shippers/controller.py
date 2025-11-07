@@ -2,7 +2,7 @@ from app.modules.shippers.model import Shipper
 from app.modules.shippers.schemas import ShipperCreate, ShipperUpdate
 from app.modules.auth.model import Account, Role
 from fastapi import HTTPException
-from app.modules.auth.controller import get_password_hash
+from app.core.security import get_passwordHash
 
 
 async def create_shipper(data: ShipperCreate) -> Shipper:
@@ -32,7 +32,7 @@ async def create_account_shipper(data: ShipperCreate):
     # Tạo Account
     account = Account(
         Email=email,
-        PasswordHash=get_password_hash(data.Password),
+        PasswordHash=get_passwordHash(data.Password),
         RoleID=str(default_role.id),
         Status="Active",
     )

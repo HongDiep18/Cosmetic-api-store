@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from typing import Tuple
+from typing import Tuple, Optional
 from fastapi import HTTPException
 from jose import jwt
 from passlib.context import CryptContext
@@ -8,7 +8,8 @@ import secrets
 from app.core.config import settings
 from app.modules.auth.model import Account, Role
 from app.modules.users.model import User
-
+from app.modules.shippers.model import Shipper
+from app.core.security import get_passwordHash
 # ==============================
 # 🔐 Cấu hình mật khẩu & JWT
 # ==============================
@@ -25,9 +26,6 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 
-def get_password_hash(password: str) -> str:
-    """Hash mật khẩu trước khi lưu"""
-    return pwd_context.hash(password)
 
 
 def create_login_token(account: Account, role_name: str) -> str:
@@ -45,7 +43,7 @@ def create_login_token(account: Account, role_name: str) -> str:
 # ==============================
 # 👤 AUTHENTICATION
 # ==============================
-async def authenticate_user(Email: str, Password: str) -> Tuple[Account, User]:
+async def authenticate_user(Email: str, Password: str) -> Tuple[Account, Optional[User]]:
     """Đăng nhập người dùng bằng email + password"""
     email = Email.strip().lower()
     print(f"📧 [AUTH] Finding account with email: {email}")
@@ -57,13 +55,23 @@ async def authenticate_user(Email: str, Password: str) -> Tuple[Account, User]:
     if not verify_password(Password, account.PasswordHash):
         raise HTTPException(status_code=401, detail="Invalid password")
 
-    # 🔧 Dùng account.id (Mongo _id) chứ không phải account.AccountID
+
     user = await User.find_one({"AccountID": account.id})
-    if not user:
+    shipper = await Shipper.find_one({"AccountID": account.id})
+
+    if not user and not shipper:
         raise HTTPException(status_code=404, detail="User profile not found")
 
-    print(f" Authenticated user: {user.FullName}")
-    return account, user
+    if user:
+        profile = user
+    elif shipper:
+        profile = shipper
+    else:
+        profile = None
+        
+    if profile:
+        print(f" Authenticated user: {profile.FullName}")
+    return account, profile
 
 
 # ==============================
@@ -90,7 +98,7 @@ async def register_user(
     # 🧾 Tạo Account
     account = Account(
         Email=email,
-        PasswordHash=get_password_hash(Password),
+        PasswordHash=get_passwordHash(Password),
         RoleID=str(default_role.id),
         Status="Active",
     )
@@ -130,7 +138,7 @@ async def change_password(account: Account, current_password: str, new_password:
     if not verify_password(current_password, account.PasswordHash):
         raise HTTPException(status_code=400, detail="Current password incorrect")
 
-    account.PasswordHash = get_password_hash(new_password)
+    account.PasswordHash = get_passwordHash(new_password)
     await account.save()
     return {"message": "Password updated successfully"}
 
@@ -167,7 +175,7 @@ async def reset_password(token: str, new_password: str):
     ):
         raise HTTPException(status_code=400, detail="Invalid or expired token")
 
-    account.PasswordHash = get_password_hash(new_password)
+    account.PasswordHash = get_passwordHash(new_password)
     account.PasswordResetToken = None
     account.PasswordResetExpires = None
     await account.save()
