@@ -106,7 +106,7 @@ def normalize_order_for_response(order) -> dict:
 @router.post("", response_model=OrderOut, status_code=status.HTTP_201_CREATED)
 async def create_order_endpoint(
 
-    data: OrderCreate, current_user: User = Depends(get_current_account)
+    data: OrderCreate, current_account: User = Depends(get_current_account)
 
 ):
     try:
@@ -143,9 +143,9 @@ async def get_my_orders(
             print(f"⚠️ User not found for AccountID={current_account.AccountID}")
             return []
 
-        user_id_str = str(user.UserID)
+        user_id_str = user.id
         print(f"🔍 Looking for orders with UserID={user_id_str}")
-        orders = await get_user_orders(user_id=user_id_str)
+        orders = await get_user_orders(user_id_str)
 
         if not orders:
             print(f"⚠️ No orders found for UserID={user_id_str}")

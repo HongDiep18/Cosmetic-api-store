@@ -23,6 +23,8 @@ from app.modules.shippers.controller import (
     delete_shipper,
 )
 
+from app.core.deps import require_admin_account
+
 router = APIRouter()
 
 
@@ -146,7 +148,9 @@ async def get_shipper_endpoint(
 async def update_shipper_endpoint(
     shipper_id: str,
     data: ShipperUpdate,
-    _: str = Depends(require_shipper_account),
+    # _: str = Depends(require_shipper_account),
+    _: str = Depends(require_admin_account), # Chỉ cho phép admin chỉnh sử
+
 ):
     shipper = await update_shipper(shipper_id, data)
     if not shipper:

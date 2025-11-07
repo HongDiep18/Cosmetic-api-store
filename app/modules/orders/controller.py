@@ -30,7 +30,7 @@ async def create_order(user_id: str, data: OrderCreate) -> Order:
 
             items.append(
                 OrderItem(
-                    ProductID=item.ProductID,
+                    ProductID=PydanticObjectId(item.ProductID),
                     Quantity=item.Quantity,
                     Price=item.Price,
                 )
@@ -58,7 +58,7 @@ async def create_order(user_id: str, data: OrderCreate) -> Order:
         raise Exception(f"Error creating order: {str(e)}")
 
 
-async def get_user_orders(user_id: str) -> List[Order]:
+async def get_user_orders(user_id: PydanticObjectId) -> List[Order]:
     try:
         # Find orders with exact user_id string match
         orders = await Order.find({"UserID": user_id}).sort("-CreatedAt").to_list()

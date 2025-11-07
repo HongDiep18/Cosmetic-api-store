@@ -18,6 +18,7 @@ async def init_db() -> None:
     from app.modules.shippers.model import Shipper
     from app.modules.shipments.model import Shipment
     from app.modules.brands.model import Brand
+    from app.modules.payments.model import Payment
 
     await beanie_init(
         database=db,
@@ -32,5 +33,6 @@ async def init_db() -> None:
             Account,
             Shipper,
             Shipment,
+            Payment
         ],
     )
