@@ -4,7 +4,9 @@ from beanie import Document, PydanticObjectId
 from pydantic import BaseModel, Field
 from bson import ObjectId
 from .schemas import OrderStatus
-from typing import Optional, Union
+
+from typing import Optional, Any
+
 
 # class OrderItem(BaseModel):
 #     ProductID: str
@@ -46,8 +48,9 @@ from typing import Optional, Union
 
 
 class OrderItem(BaseModel):
-    ProductID: Union[str, PydanticObjectId]
-    # ProductID: Optional[PydanticObjectId] 
+
+    # Allow both string and ObjectId-like values (from older data)
+    ProductID: Any
     Quantity: int = Field(ge=1)
     Price: float = Field(ge=0)
     

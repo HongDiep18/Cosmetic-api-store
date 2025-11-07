@@ -10,8 +10,10 @@ from app.modules.shippers.schemas import (
     DeliveryDetailsOut,
     DeliverySummaryOut,
 )
-from app.modules.shippers.deliveries import get_delivery_details
-from app.modules.shippers.controllers.list_deliveries import list_deliveries_by_shipper
+from app.modules.shippers.deliveries import (
+    get_delivery_details,
+    list_deliveries_by_shipper,
+)
 from app.modules.shippers.controller import (
     create_shipper,
     create_account_shipper,
@@ -77,12 +79,12 @@ async def list_shippers_endpoint():
 
 
 # Get list of all deliveries for shipper - PHẢI ĐẶT TRƯỚC /{shipper_id}
-@router.get("/shipper-portal/deliveries", response_model=list[DeliverySummaryOut])
+@router.get("/deliveries", response_model=list[DeliverySummaryOut])
 async def get_deliveries_list(
     status: Optional[str] = None,
 ):
     """
-    Lấy danh sách vận đơn - TEST MODE (không cần xác thực)
+    Lấy danh sách vận đơn - TEST MODE (không  xác thực)
     """
     try:
         # Test mode: không cần xác thực, lấy tất cả đơn hàng

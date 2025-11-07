@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.params import Query
+from bson import ObjectId
+from beanie import PydanticObjectId
 
 from app.core.deps import require_admin_account, get_current_account
-from app.modules.orders.schemas import OrderCreate, OrderOut
+from app.modules.orders.schemas import OrderCreate, OrderOut, OrderStatusUpdate
 from app.modules.users.model import User
 from app.modules.auth.model import Account
 from app.modules.orders.controller import (
@@ -17,10 +19,66 @@ from app.modules.orders.controller import (
     get_today_pending_orders_count,
     get_monthly_revenue,
     get_best_selling_products_in_month,
+    get_order_summaries,
 )
 
 
 router = APIRouter()
+
+
+def normalize_order_for_response(order) -> dict:
+    """Normalize Order object for response, converting ObjectId to string"""
+    items_normalized = []
+    for item in order.Items:
+        # Support both dict and object item representations
+        if isinstance(item, dict):
+            raw_pid = item.get("ProductID")
+            if isinstance(raw_pid, (ObjectId, PydanticObjectId)):
+                pid_str = str(raw_pid)
+            elif isinstance(raw_pid, str):
+                pid_str = raw_pid
+            else:
+                pid_str = str(raw_pid) if raw_pid is not None else ""
+
+            items_normalized.append(
+                {
+                    "ProductID": pid_str,
+                    "Quantity": int(item.get("Quantity", 0)),
+                    "Price": float(item.get("Price", 0.0)),
+                }
+            )
+        else:
+            product_id = getattr(item, "ProductID", None)
+            # Convert ObjectId or PydanticObjectId to string
+            if isinstance(product_id, (ObjectId, PydanticObjectId)):
+                product_id = str(product_id)
+            elif not isinstance(product_id, str):
+                product_id = str(product_id) if product_id is not None else ""
+
+            items_normalized.append(
+                {
+                    "ProductID": product_id,
+                    "Quantity": int(getattr(item, "Quantity", 0)),
+                    "Price": float(getattr(item, "Price", 0.0)),
+                }
+            )
+
+    # Build order dict
+    order_dict = {
+        "_id": str(order.id),
+        "OrderID": str(order.OrderID) if hasattr(order, "OrderID") else str(order.id),
+        "UserID": str(order.UserID) if order.UserID else "",
+        "ShippingAddress": order.ShippingAddress,
+        "OrderDate": order.OrderDate,
+        "TotalAmount": order.TotalAmount,
+        "Status": order.Status.value
+        if hasattr(order.Status, "value")
+        else str(order.Status),
+        "Items": items_normalized,
+        "CreatedAt": order.CreatedAt,
+        "UpdatedAt": order.UpdatedAt,
+    }
+    return order_dict
 
 
 # create order test
@@ -43,11 +101,13 @@ router = APIRouter()
 #             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
 #         )
 
+
 # create order
 @router.post("", response_model=OrderOut, status_code=status.HTTP_201_CREATED)
 async def create_order_endpoint(
-    data: OrderCreate,
-    current_account: Account = Depends(get_current_account)
+
+    data: OrderCreate, current_user: User = Depends(get_current_account)
+
 ):
     try:
         # Tìm User từ AccountID
@@ -71,7 +131,7 @@ async def create_order_endpoint(
 
 
 
-# get orders of current user
+# get 1 order - user view order of them
 @router.get("/get-order", response_model=list[OrderOut])
 async def get_my_orders(
     current_account: Account = Depends(get_current_account)
@@ -150,18 +210,55 @@ async def list_orders_endpoint():
     return results
 
 
+# Update order status
 @router.patch(
     "/{order_id}/status",
-    response_model=OrderOut,
-    dependencies=[Depends(require_admin_account)],
+    # response_model=OrderOut,
+    # dependencies=[Depends(require_admin_account)],
 )
-async def update_status_endpoint(order_id: str, status: str):
-    order = await update_order_status(order_id, status)
-    if not order:
+async def update_status_endpoint(
+    order_id: str,
+    status_data: OrderStatusUpdate,
+):
+    """
+    Update an order's status.
+
+    Valid status values:
+    - Pending
+    - Confirmed
+    - Processing
+    - Shipped
+    - Delivered
+    - Failed
+    - Cancelled
+
+    Request body example:
+    {
+        "Status": "Confirmed"
+    }
+    """
+    try:
+        # Extract status from request body (OrderStatus enum -> string)
+        new_status = status_data.Status.value
+
+        order = await update_order_status(order_id, new_status)
+        if not order:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Order not found"
+            )
+
+        # Normalize Order object (convert ObjectId to string)
+        order_dict = normalize_order_for_response(order)
+        return order_dict
+
+    except HTTPException as e:
+        raise e
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Order not found"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
         )
-    return OrderOut.model_validate(order, from_attributes=True)
 
 
 # Get status summary
@@ -177,6 +274,7 @@ async def revenue_last_7_days_endpoint():
     revenue = await get_last_7_days_total_revenue()
     return {"total_revenue": revenue}
 
+
 # Route lấy doanh thu theo ngày (YYYY-MM-DD)
 @router.get("/revenue-by-date")
 async def revenue_by_date_endpoint(date: str):
@@ -185,6 +283,7 @@ async def revenue_by_date_endpoint(date: str):
     """
     revenue = await get_revenue_by_date(date)
     return {"revenue_by_date": revenue}
+
 
 # Route lấy doanh thu hôm nay
 @router.get("/revenue-today")
@@ -231,5 +330,17 @@ async def best_selling_products_endpoint(
     return {"best_selling_products": products}
 
 
-
-
+# Trang
+@router.get("/order-summary")
+async def get_order_summary_endpoint():
+    """
+    Lấy danh sách đơn hàng gồm ID, địa chỉ, ngày đặt, tổng số lượng và tổng tiền.
+    """
+    try:
+        summaries = await get_order_summaries()
+        return {"orders": summaries}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error retrieving order summary: {str(e)}",
+        )
