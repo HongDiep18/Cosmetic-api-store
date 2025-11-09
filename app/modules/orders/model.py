@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 from bson import ObjectId
 from .schemas import OrderStatus
 
-from typing import Optional, Any
+from typing import Optional
 
 
 # class OrderItem(BaseModel):
@@ -46,23 +46,24 @@ from typing import Optional, Any
 #         return await super().save(*args, **kwargs)
 
 
-
 class OrderItem(BaseModel):
-
     # Allow both string and ObjectId-like values (from older data)
     ProductID: Optional[PydanticObjectId]
     Quantity: int = Field(ge=1)
     Price: float = Field(ge=0)
-    
+
     model_config = {
         "json_encoders": {
             ObjectId: str,
-            PydanticObjectId: str  # Khi serialize ra JSON, ObjectId → string
+            PydanticObjectId: str,  # Khi serialize ra JSON, ObjectId → string
         }
     }
-    
+
+
 class Order(Document):
-    OrderID: Optional[PydanticObjectId] = Field(default_factory=PydanticObjectId, alias="_id")
+    OrderID: Optional[PydanticObjectId] = Field(
+        default_factory=PydanticObjectId, alias="_id"
+    )
     UserID: Optional[PydanticObjectId]
     ShippingAddress: str
     OrderDate: datetime = Field(default_factory=datetime.utcnow)

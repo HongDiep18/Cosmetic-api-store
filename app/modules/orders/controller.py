@@ -413,6 +413,59 @@ async def get_best_selling_products_in_month(
     return results
 
 
+# Lấy danh sách đơn hàng sẵn sàng tạo vận đơn
+async def get_orders_ready_for_shipment() -> List[Order]:
+    """
+    Lấy danh sách đơn hàng thỏa mãn điều kiện:
+    1. Có trạng thái là Confirmed hoặc Processing
+    2. Chưa được tạo vận đơn (không tồn tại trong collection Shipments)
+
+    Returns:
+        List[Order]: Danh sách đơn hàng đáp ứng điều kiện
+    """
+    try:
+        # Pipeline aggregate để lấy đơn hàng phù hợp
+        pipeline = [
+            # Stage 1: Chỉ lấy đơn hàng có status phù hợp
+            {"$match": {"Status": {"$in": ["Pending", "Processing"]}}},
+            # Stage 2: Left join với collection shipments
+            {
+                "$lookup": {
+                    "from": "shipments",
+                    "localField": "_id",
+                    "foreignField": "OrderID",
+                    "as": "shipments",
+                }
+            },
+            # Stage 3: Chỉ lấy đơn hàng chưa có trong shipments
+            {"$match": {"shipments": {"$size": 0}}},
+            # Stage 4: Loại bỏ field shipments không cần thiết
+            {"$project": {"shipments": 0}},
+        ]
+
+        # Thực hiện aggregate và chuyển kết quả về Order objects
+        results = await Order.aggregate(pipeline).to_list(None)
+
+        orders: List[Order] = []
+        for doc in results:
+            try:
+                # Chuyển từ dict sang Order object
+                order = Order.parse_obj(doc)
+                orders.append(order)
+            except Exception as e:
+                print(f"❌ Error parsing order: {e}")
+                continue
+
+        return orders
+
+    except Exception as e:
+        print(f"❌ Error getting orders ready for shipment: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error getting orders ready for shipment: {str(e)}",
+        )
+
+
 # Trang
 # lấy thông tin đơn hàng
 async def get_order_summaries() -> list[dict]:
