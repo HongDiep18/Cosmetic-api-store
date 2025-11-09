@@ -1,3 +1,4 @@
+from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.params import Query
 from bson import ObjectId
@@ -19,6 +20,7 @@ from app.modules.orders.controller import (
     get_today_pending_orders_count,
     get_monthly_revenue,
     get_best_selling_products_in_month,
+    get_orders_ready_for_shipment,
     get_order_summaries,
 )
 
@@ -105,9 +107,7 @@ def normalize_order_for_response(order) -> dict:
 # create order
 @router.post("", response_model=OrderOut, status_code=status.HTTP_201_CREATED)
 async def create_order_endpoint(
-
     data: OrderCreate, current_account: User = Depends(get_current_account)
-
 ):
     try:
         # Tìm User từ AccountID
@@ -116,7 +116,7 @@ async def create_order_endpoint(
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
             )
-        
+
         order = await create_order(user_id=str(user.UserID), data=data)
         return OrderOut.model_validate(order, from_attributes=True)
 
@@ -130,12 +130,9 @@ async def create_order_endpoint(
         )
 
 
-
 # get 1 order - user view order of them
 @router.get("/get-order", response_model=list[OrderOut])
-async def get_my_orders(
-    current_account: Account = Depends(get_current_account)
-):
+async def get_my_orders(current_account: Account = Depends(get_current_account)):
     try:
         # Tìm User từ AccountID
         user = await User.find_one(User.AccountID == current_account.AccountID)
@@ -157,7 +154,9 @@ async def get_my_orders(
             try:
                 results.append(OrderOut.model_validate(o, from_attributes=True))
             except Exception as e:
-                print(f"⚠️ model_validate from_attributes=True failed: {e}. Retrying with from_attributes=False")
+                print(
+                    f"⚠️ model_validate from_attributes=True failed: {e}. Retrying with from_attributes=False"
+                )
                 results.append(OrderOut.model_validate(o, from_attributes=False))
         return results
     except Exception as e:
@@ -195,8 +194,31 @@ async def get_list_all_orders(
         )
 
 
+# get status of shipment
+@router.get("/ready-for-shipment", response_model=List[OrderOut])
+async def get_ready_for_shipment_endpoint():
+    """
+    Lấy danh sách đơn hàng sẵn sàng để tạo vận đơn:
+    - Có trạng thái là Confirmed hoặc Processing
+    - Chưa được tạo vận đơn trước đây
+    """
+    try:
+        orders = await get_orders_ready_for_shipment()
+        if not orders:
+            return []
+
+        return [
+            OrderOut.model_validate(order, from_attributes=True) for order in orders
+        ]
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error getting orders ready for shipment: {str(e)}",
+        )
+
+
 @router.get(
-    "/", response_model=list[OrderOut], dependencies=[Depends(require_admin_account)]
+    "/", response_model=List[OrderOut], dependencies=[Depends(require_admin_account)]
 )
 async def list_orders_endpoint():
     orders = await list_all_orders()
