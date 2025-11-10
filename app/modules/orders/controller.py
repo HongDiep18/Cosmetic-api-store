@@ -3,9 +3,10 @@ from datetime import datetime, timedelta
 from bson.son import SON
 from beanie import PydanticObjectId
 from fastapi import HTTPException, status
-
+from app.modules.payments.model import Payment
 from app.modules.orders.model import Order, OrderItem
 from app.modules.orders.schemas import OrderCreate
+from bson import ObjectId
 
 # Valid order status transitions
 VALID_STATUS_TRANSITIONS: Dict[str, List[str]] = {
@@ -106,6 +107,30 @@ async def list_all_orders() -> List[Order]:
         print(f"list_all_orders: raw collection find error: {e}")
         return []
 
+async def attach_payment_info(order):
+    try:
+        order_id = order.id if isinstance(order.id, ObjectId) else ObjectId(order.id)
+    except Exception:
+        order_id = order.id  # fallback
+
+    payment = None
+    try:
+        # Thử tìm bằng ObjectId
+        payment = await Payment.find_one(Payment.OrderID == order_id)
+        if not payment:
+            # fallback: thử tìm bằng string
+            payment = await Payment.find_one(Payment.OrderID == str(order_id))
+    except Exception as e:
+        print(f"⚠️ Lỗi tìm payment cho order {order_id}: {e}")
+
+    # Convert sang dict để tránh Beanie Document lỗi
+    order_dict = order.dict() if hasattr(order, "dict") else dict(order)
+
+    order_dict["PaymentID"] = str(payment.id) if payment else None
+    order_dict["PaymentMethod"] = getattr(payment, "PaymentMethod", None)
+    order_dict["PaymentStatus"] = getattr(payment, "PaymentStatus", None)
+
+    return order_dict
 
 async def update_order_status(order_id: str, new_status: str) -> Optional[Order]:
     """
