@@ -76,11 +76,27 @@ async def test_products_endpoint():
     # # dependencies=[Depends(require_admin_account)],
 )
 async def create_product_endpoint(data: ProductCreate):
-    print(f"📦 Creating product with data: {data.model_dump()}")
-    print(f"📦 Product Image: {data.Image}")
-    product = await create_product(data)
-    print(f"✅ Product created: {product.id}, Image: {product.Image}")
-    return convert_product_to_out(product)
+    try:
+        print(f"📦 Creating product with data: {data.model_dump()}")
+        print(f"📦 Product Image: {data.Image}")
+        print(f"📦 CategoryID: {data.CategoryID}")
+        print(f"📦 CategoryName: {data.CategoryName}")
+        product = await create_product(data)
+        print(f"✅ Product created: {product.id}, Image: {product.Image}")
+        return convert_product_to_out(product)
+    except Exception as e:
+        print(f"❌ Error creating product: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        if "validation" in str(e).lower():
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Validation error: {str(e)}"
+            )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error creating product: {str(e)}"
+        )
 
 
 @router.get("", response_model=PaginatedResponse)  # Không có trailing slash
