@@ -16,7 +16,7 @@ class ProductBase(BaseModel):
     Image: Optional[str] = None
     CategoryID: str
     CategoryName: Optional[str] = None
-    
+
     @field_validator("CategoryID", mode="before")
     @classmethod
     def convert_category_id(cls, v):
@@ -26,13 +26,13 @@ class ProductBase(BaseModel):
             return str(v)
         if isinstance(v, str):
             raw = v.strip().strip('"').strip("'")
-            print(f"🔍 Processed CategoryID: {raw}")
+            # print(f"🔍 Processed CategoryID: {raw}")
             if raw.lower() in {"undefined", "null", ""}:
                 raise ValueError("CategoryID is required")
             return raw
         print(f"🔍 CategoryID after validation: {v}")
         return v
-    
+
     Rating: Optional[float] = Field(default=0.0, ge=0, le=5)
     ReviewCount: Optional[int] = Field(default=0, ge=0)
     IsFeatured: Optional[bool] = False
@@ -85,7 +85,5 @@ class PaginatedResponse(BaseModel):
     totalPages: int
 
 
-
-    
 class StockUpdateRequest(BaseModel):
     quantity: int = Field(..., ge=0, description="Số lượng tồn kho mới")

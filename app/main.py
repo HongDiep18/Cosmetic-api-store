@@ -19,6 +19,7 @@ from app.modules.shippers.routes import router as shippers_router
 from app.modules.account.routes import router as account_router
 from app.modules.shipments.routes import router as shipments_router
 from app.modules.payments.routes import router as payments_router
+
 #  Tạo app chính
 app = FastAPI(
     title=settings.APP_NAME,
@@ -53,14 +54,14 @@ app.add_middleware(
 try:
     app.include_router(auth_router, prefix="/api/auth", tags=["Auth"])
     app.include_router(users_router, prefix="/api/users", tags=["Users"])
-    
+
     # Products router - quan trọng nhất
     app.include_router(products_router, prefix="/api/products", tags=["Products"])
-    print(f"✅ Products router registered with {len(products_router.routes)} routes")
+    # print(f"✅ Products router registered with {len(products_router.routes)} routes")
     for route in products_router.routes:
-        if hasattr(route, 'path') and hasattr(route, 'methods'):
+        if hasattr(route, "path") and hasattr(route, "methods"):
             print(f"   - {' '.join(route.methods)} /api/products{route.path}")
-    
+
     app.include_router(orders_router, prefix="/api/orders", tags=["Orders"])
     app.include_router(categories_router, prefix="/api/categories", tags=["Categories"])
     app.include_router(reviews_router, prefix="/api/reviews", tags=["Reviews"])
@@ -73,6 +74,7 @@ try:
 except Exception as e:
     print(f"❌ Error registering routers: {e}")
     import traceback
+
     traceback.print_exc()
 
 
@@ -102,6 +104,7 @@ uploads_dir = Path("public/uploads")
 uploads_dir.mkdir(parents=True, exist_ok=True)
 
 app.mount("/uploads", StaticFiles(directory=str(uploads_dir)), name="uploads")
+
 
 #  Health check endpoint
 @app.get("/", tags=["Health"])
@@ -133,8 +136,5 @@ async def root():
 # print("="*60 + "\n")
 
 
-
-
-
-for route in app.routes:
-    print(f"✅ Route loaded: {route.path}")
+# for route in app.routes:
+#     print(f"✅ Route loaded: {route.path}")

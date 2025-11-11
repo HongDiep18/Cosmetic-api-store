@@ -9,6 +9,7 @@ from app.modules.shippers.schemas import (
     ShipperUpdate,
     DeliveryDetailsOut,
     DeliverySummaryOut,
+    DeliveryStatusUpdate,
 )
 from app.modules.shippers.deliveries import (
     get_delivery_details,
@@ -24,6 +25,8 @@ from app.modules.shippers.controller import (
 )
 
 from app.core.deps import require_admin_account
+from app.modules.orders.controller import update_order_status
+from beanie import PydanticObjectId
 
 router = APIRouter()
 
@@ -131,6 +134,118 @@ async def get_delivery_details_endpoint(
         )
 
 
+# Update delivery/order status - MUST be placed BEFORE /{shipper_id} route
+@router.patch("/deliveries/{order_id}/status")
+async def update_delivery_status_endpoint(
+    order_id: str,
+    status_update: DeliveryStatusUpdate,
+    # _: str = Depends(require_shipper_account),
+):
+    """
+    Update delivery/order status from shipper portal.
+
+    This endpoint updates the order status in the orders collection.
+    The order_id can be either the OrderID or ShipmentID (which will be resolved to OrderID).
+
+    Valid status values:
+    - Processing
+    - Shipped
+    - Delivered
+    - Failed
+    - Cancelled
+    """
+    try:
+        new_status = status_update.status.strip()
+
+        # Validate status is one of the allowed values
+        allowed_statuses = [
+            "Pending",
+            "Confirmed",
+            "Processing",
+            "Shipped",
+            "Delivered",
+            "Failed",
+            "Cancelled",
+        ]
+        if new_status not in allowed_statuses:
+            # Try to match case-insensitively
+            new_status_lower = new_status.lower()
+            for allowed in allowed_statuses:
+                if allowed.lower() == new_status_lower:
+                    new_status = allowed
+                    break
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid status. Must be one of: {', '.join(allowed_statuses)}",
+                )
+
+        # Try to update the order
+        # First, try to use order_id as OrderID (MongoDB _id)
+        order = None
+        try:
+            # Validate that order_id is a valid ObjectId format
+            try:
+                PydanticObjectId(order_id)
+            except Exception:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid order ID format: {order_id}",
+                )
+
+            order = await update_order_status(order_id, new_status)
+            if order:
+                return {
+                    "success": True,
+                    "OrderID": str(order.id),
+                    "Status": order.Status,
+                    "UpdatedAt": order.UpdatedAt,
+                }
+        except HTTPException:
+            raise
+        except Exception as e:
+            print(f"⚠️ Failed to update order with ID {order_id}: {e}")
+            import traceback
+
+            traceback.print_exc()
+
+        # If that fails, try to find order by ShipmentID
+        # Import here to avoid circular dependency
+        from app.modules.shipments.model import Shipment
+
+        try:
+            shipment = await Shipment.get(PydanticObjectId(order_id))
+            if shipment and shipment.OrderID:
+                order = await update_order_status(str(shipment.OrderID), new_status)
+                if order:
+                    return {
+                        "success": True,
+                        "OrderID": str(order.id),
+                        "Status": order.Status,
+                        "UpdatedAt": order.UpdatedAt,
+                    }
+        except Exception as e:
+            print(f"⚠️ Failed to find shipment with ID {order_id}: {e}")
+
+        # If we get here, order was not found
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Order not found: {order_id}. Please verify the order ID is correct.",
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error updating delivery status: {e}")
+        import traceback
+
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error updating delivery status: {str(e)}",
+        )
+
+
 @router.get("/{shipper_id}", response_model=ShipperOut)
 async def get_shipper_endpoint(
     shipper_id: str,
@@ -149,8 +264,7 @@ async def update_shipper_endpoint(
     shipper_id: str,
     data: ShipperUpdate,
     # _: str = Depends(require_shipper_account),
-    _: str = Depends(require_admin_account), # Chỉ cho phép admin chỉnh sử
-
+    _: str = Depends(require_admin_account),  # Chỉ cho phép admin chỉnh sử
 ):
     shipper = await update_shipper(shipper_id, data)
     if not shipper:
