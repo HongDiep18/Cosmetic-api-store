@@ -45,12 +45,28 @@ async def list_products(
 
 
 async def create_product(data: ProductCreate) -> Product:
-    product_data = data.model_dump()
-    print(f"📦 Creating product - Image field: {product_data.get('Image')}")
-    product = Product(**product_data)
-    await product.insert()
-    print(f"✅ Product created with Image: {product.Image}")
-    return product
+    try:
+        print(f"📦 Creating product with data: {data.model_dump()}")
+        print(f"📦 CategoryID: {data.CategoryID}")
+        print(f"📦 CategoryName: {data.CategoryName}")
+        
+        # Validate data trước khi tạo product
+        product_data = data.model_dump()
+        print(f"📦 Product data after model_dump: {product_data}")
+        
+        if not product_data.get('CategoryID'):
+            raise ValueError("CategoryID is required and cannot be empty")
+            
+        print(f"📦 Creating product - Image field: {product_data.get('Image')}")
+        product = Product(**product_data)
+        await product.insert()
+        print(f"✅ Product created with Image: {product.Image}")
+        return product
+    except Exception as e:
+        print(f"❌ Error in create_product: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise
 
 
 async def get_product(product_id: str) -> Optional[Product]:

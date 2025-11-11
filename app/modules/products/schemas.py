@@ -20,14 +20,17 @@ class ProductBase(BaseModel):
     @field_validator("CategoryID", mode="before")
     @classmethod
     def convert_category_id(cls, v):
+        print(f"🔍 Validating CategoryID: {v}")
         # Chuyển đổi ObjectId sang string nếu cần
         if isinstance(v, ObjectId):
             return str(v)
         if isinstance(v, str):
             raw = v.strip().strip('"').strip("'")
+            print(f"🔍 Processed CategoryID: {raw}")
             if raw.lower() in {"undefined", "null", ""}:
                 raise ValueError("CategoryID is required")
             return raw
+        print(f"🔍 CategoryID after validation: {v}")
         return v
     
     Rating: Optional[float] = Field(default=0.0, ge=0, le=5)

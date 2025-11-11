@@ -44,7 +44,7 @@ class Product(Document):
 
     class Settings:
         name = "products"
-        use_revision = True
+        use_revision = False  # Tắt revision để không có revision_id trong document
 
     model_config = ConfigDict(
         arbitrary_types_allowed=True,
