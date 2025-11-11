@@ -5,7 +5,12 @@ from bson import ObjectId
 from beanie import PydanticObjectId
 
 from app.core.deps import require_admin_account, get_current_account
-from app.modules.orders.schemas import OrderCreate, OrderOut, OrderStatusUpdate,OrderOutCustom
+from app.modules.orders.schemas import (
+    OrderCreate,
+    OrderOut,
+    OrderStatusUpdate,
+    OrderOutCustom,
+)
 from app.modules.users.model import User
 from app.modules.auth.model import Account
 from app.modules.orders.controller import (
@@ -195,10 +200,8 @@ async def get_list_all_orders(
         )
 
 
-
 @router.get("/list-orders-custom", response_model=list[OrderOutCustom])
-async def get_list_all_orders(
-):
+async def get_list_all_orders():
     try:
         orders = await list_all_orders()
 
@@ -212,17 +215,16 @@ async def get_list_all_orders(
                 # Try attribute-based validation (Beanie Document)
                 results.append(OrderOutCustom.model_validate(o, from_attributes=True))
             except Exception:
-               # Nếu 1 đơn nào đó bị lỗi payment hoặc validation thì log lại, bỏ qua lỗi
+                # Nếu 1 đơn nào đó bị lỗi payment hoặc validation thì log lại, bỏ qua lỗi
                 print(f"⚠️ Lỗi xử lý order {getattr(o, '_id', 'unknown')}: {e}")
                 # Vẫn thêm đơn đó nhưng không có payment
                 order_dict = o.dict() if hasattr(o, "dict") else dict(o)
-                order_dict.update({
-                    "PaymentID": None,
-                    "PaymentMethod": None,
-                    "PaymentStatus": None
-                })
-                results.append(OrderOutCustom.model_validate(order_dict, from_attributes=False))
-                
+                order_dict.update(
+                    {"PaymentID": None, "PaymentMethod": None, "PaymentStatus": None}
+                )
+                results.append(
+                    OrderOutCustom.model_validate(order_dict, from_attributes=False)
+                )
 
         return results
     except Exception as e:
@@ -270,7 +272,7 @@ async def list_orders_endpoint():
     return results
 
 
-# Update order status
+# Update order status (order-status)
 @router.patch(
     "/{order_id}/status",
     # response_model=OrderOut,

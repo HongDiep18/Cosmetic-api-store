@@ -53,14 +53,33 @@ class DeliverySummaryOut(BaseModel):
     """Schema for summarized delivery information shown in list view"""
 
     ShipmentID: str = Field(description="ID của vận đơn")
+    OrderID: str = Field(description="ID của đơn hàng (để cập nhật trạng thái)")
     TrackingNumber: str = Field(description="Mã vận đơn (VD: VD001-2024)")
     CustomerName: str = Field(description="Tên khách hàng")
     ShippingAddress: str = Field(description="Địa chỉ giao hàng")
     CODAmount: float = Field(description="Số tiền thu hộ (0 nếu đã thanh toán)")
-    Status: str = Field(description="Trạng thái vận đơn")
+    Status: str = Field(description="Trạng thái vận đơn/đơn hàng")
+    CustomerPhone: Optional[str] = Field(
+        default="", description="Số điện thoại khách hàng"
+    )
+    Items: Optional[List[OrderItemDetail]] = Field(
+        default=[], description="Danh sách sản phẩm"
+    )
 
     class Config:
         from_attributes = True
+
+
+class DeliveryStatusUpdate(BaseModel):
+    """Schema for updating delivery/order status from shipper portal"""
+
+    status: str = Field(
+        ...,
+        description="New status for the order (e.g., 'Shipped', 'Delivered', 'Failed')",
+    )
+
+    class Config:
+        json_schema_extra = {"example": {"status": "Shipped"}}
 
 
 class DeliveryDetailsOut(BaseModel):

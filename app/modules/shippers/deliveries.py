@@ -37,54 +37,72 @@ db = client[settings.MONGODB_DB]
 async def get_delivery_details(
     shipment_id: str, current_shipper_id: Optional[str] = None
 ) -> DeliveryDetailsOut:
-    """Return aggregated delivery details for a shipment.
+    """Return aggregated delivery details for a shipment or order.
 
     Inputs:
-      - shipment_id: string (hex ObjectId)
+      - shipment_id: string (hex ObjectId) - can be either ShipmentID or OrderID
       - current_shipper_id: optional shipper id string for authorization
 
     Output: DeliveryDetailsOut (raises HTTPException on errors)
     """
     try:
-        # Convert shipment id
+        # Validate ID format
         try:
-            shipment_obj_id = PydanticObjectId(shipment_id)
+            obj_id = PydanticObjectId(shipment_id)
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid shipment ID format: {e}",
-            )
-
-        # Load shipment
-        shipment = await Shipment.get(shipment_obj_id)
-        if not shipment:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Shipment not found with ID: {shipment_id}",
-            )
-
-        # Authorization check (if provided)
-        # if current_shipper_id and str(shipment.ShipperID) != current_shipper_id:
-        #     raise HTTPException(
-        #         status_code=status.HTTP_403_FORBIDDEN,
-        #         detail="Not authorized to view this delivery",
-        #     )
-
-        # Load order using motor to avoid validation errors when ProductID stored
-        # as ObjectId while Order model expects string ProductID.
-        if not shipment.OrderID:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Shipment has no associated order ID",
+                detail=f"Invalid ID format: {e}",
             )
 
         client = AsyncIOMotorClient(settings.MONGODB_URI)
         db = client[settings.MONGODB_DB]
-        order = await db["orders"].find_one({"_id": shipment.OrderID})
+        order = None
+        shipment = None
+        order_id = None
+        tracking_number = "N/A"
+        shipment_status = "Unknown"
+
+        # Strategy 1: Try to find shipment by ID first
+        try:
+            shipment = await Shipment.get(obj_id)
+            if shipment and shipment.OrderID:
+                order_id = shipment.OrderID
+                tracking_number = getattr(shipment, "TrackingNumber", "N/A") or "N/A"
+                shipment_status = str(getattr(shipment, "Status", "Unknown"))
+                # Load order from shipment
+                order = await db["orders"].find_one({"_id": order_id})
+        except Exception as e:
+            print(f"⚠️ Shipment lookup by ID failed: {e}")
+
+        # Strategy 2: If order not found, try to find order directly by ID
+        if not order:
+            try:
+                order = await db["orders"].find_one({"_id": obj_id})
+                if order:
+                    order_id = obj_id
+                    # Try to find associated shipment by OrderID
+                    try:
+                        shipment_dict = await db["shipments"].find_one(
+                            {"OrderID": obj_id}
+                        )
+                        if shipment_dict:
+                            tracking_number = (
+                                shipment_dict.get("TrackingNumber", "N/A") or "N/A"
+                            )
+                            shipment_status = str(
+                                shipment_dict.get("Status", "Unknown")
+                            )
+                    except Exception as e:
+                        print(f"⚠️ Associated shipment lookup failed: {e}")
+            except Exception as e:
+                print(f"⚠️ Order lookup by ID failed: {e}")
+
+        # If order still not found, return error
         if not order:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Order not found with ID: {shipment.OrderID}",
+                detail=f"Order not found with ID: {shipment_id}. Please verify the ID is correct.",
             )
 
         # Load customer (UserID may be ObjectId)
@@ -173,8 +191,8 @@ async def get_delivery_details(
 
         # Build response
         response = DeliveryDetailsOut(
-            TrackingNumber=getattr(shipment, "TrackingNumber", "N/A") or "N/A",
-            ShipmentStatus=str(getattr(shipment, "Status", "Unknown")),
+            TrackingNumber=tracking_number,
+            ShipmentStatus=shipment_status,
             OrderID=str(order.get("_id", "")),
             ShippingAddress=order.get("ShippingAddress", ""),
             TotalAmount=float(order.get("TotalAmount", 0.0)),
@@ -258,8 +276,10 @@ async def list_deliveries_by_shipper(
         {
             "$project": {
                 "ShipmentID": {"$toString": "$_id"},
+                "OrderID": {"$toString": "$order._id"},
                 "TrackingNumber": {"$ifNull": ["$TrackingNumber", ""]},
                 "CustomerName": {"$ifNull": ["$user.FullName", ""]},
+                "CustomerPhone": {"$ifNull": ["$user.Phone", ""]},
                 "ShippingAddress": {"$ifNull": ["$order.ShippingAddress", ""]},
                 "CODAmount": {
                     "$cond": {
@@ -274,7 +294,8 @@ async def list_deliveries_by_shipper(
                         "else": 0,
                     }
                 },
-                "Status": {"$ifNull": ["$Status", ""]},
+                "Status": {"$ifNull": ["$order.Status", "$Status", ""]},
+                "Items": {"$ifNull": ["$order.Items", []]},
             }
         },
     ]
@@ -283,14 +304,51 @@ async def list_deliveries_by_shipper(
     deliveries = []
 
     async for doc in cursor:
+        # Process items
+        items = []
+        for item in doc.get("Items", []):
+            try:
+                # Extract product info
+                product_id = str(item.get("ProductID", ""))
+
+                # Try to get product name
+                product_name = "Unknown Product"
+                try:
+                    if product_id:
+                        product_obj_id = PydanticObjectId(product_id)
+                        product = await Product.get(product_obj_id)
+                        if product:
+                            product_name = getattr(
+                                product, "ProductName", "Unknown Product"
+                            )
+                except Exception:
+                    pass
+
+                items.append(
+                    OrderItemDetail(
+                        ProductID=product_id,
+                        ProductName=product_name,
+                        Quantity=int(item.get("Quantity", 0)),
+                        Price=float(item.get("Price", 0.0)),
+                    )
+                )
+            except Exception as e:
+                print(f"Error processing item: {e}")
+                continue
+
         # Convert to DeliverySummaryOut model
         delivery = DeliverySummaryOut(
             ShipmentID=doc["ShipmentID"],
+            OrderID=doc.get(
+                "OrderID", doc["ShipmentID"]
+            ),  # Fallback to ShipmentID if OrderID missing
             TrackingNumber=doc.get("TrackingNumber", ""),
             CustomerName=doc.get("CustomerName", ""),
+            CustomerPhone=doc.get("CustomerPhone", ""),
             ShippingAddress=doc.get("ShippingAddress", ""),
             CODAmount=float(doc.get("CODAmount", 0)),
             Status=doc.get("Status", ""),
+            Items=items,
         )
         deliveries.append(delivery)
 
