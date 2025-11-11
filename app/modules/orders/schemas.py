@@ -3,7 +3,6 @@ from typing import List, Optional
 from datetime import datetime
 from pydantic import BaseModel, Field, field_validator
 from bson import ObjectId
-
 from enum import Enum
 
 
@@ -191,3 +190,7 @@ class OrderOut(OrderBase):
             return str(v) if v is not None else v
         except Exception:
             return v
+
+class OrderOutCustom(OrderOut):
+    PaymentID: Optional[str]
+    PaymentMethod: Optional[str]
