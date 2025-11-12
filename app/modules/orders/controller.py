@@ -220,18 +220,23 @@ async def get_order_status_summary():
     return summary
 
 
-# lấy doanh thu 7 ngày gần nhất
+# Lấy doanh thu 7 ngày gần nhất chỉ của đơn hàng Delivered
 async def get_last_7_days_total_revenue() -> list[dict]:
     """
-    Trả về doanh thu từng ngày của 7 ngày gần nhất.
+    Trả về doanh thu từng ngày của 7 ngày gần nhất với status = "Delivered".
     Nếu ngày nào không có đơn hàng, revenue = 0.
     """
     today = datetime.utcnow()
     seven_days_ago = today - timedelta(days=6)  # 7 ngày tính từ 6 ngày trước + hôm nay
 
-    # Pipeline MongoDB: nhóm theo ngày
+    # Pipeline MongoDB: nhóm theo ngày với điều kiện Status = "Delivered"
     pipeline = [
-        {"$match": {"OrderDate": {"$gte": seven_days_ago}}},
+        {
+            "$match": {
+                "OrderDate": {"$gte": seven_days_ago},
+                "Status": "Delivered"
+            }
+        },
         {
             "$group": {
                 "_id": {
@@ -249,9 +254,7 @@ async def get_last_7_days_total_revenue() -> list[dict]:
 
     # Chuyển kết quả aggregate thành dict: "YYYY-MM-DD" -> revenue
     revenue_dict = {
-        f"{r['_id']['year']}-{r['_id']['month']:02d}-{r['_id']['day']:02d}": r[
-            "revenue"
-        ]
+        f"{r['_id']['year']}-{r['_id']['month']:02d}-{r['_id']['day']:02d}": r["revenue"]
         for r in results
     }
 
@@ -268,7 +271,6 @@ async def get_last_7_days_total_revenue() -> list[dict]:
         )
 
     return daily_revenue
-
 
 # lấy doanh thu từng ngày
 # Hàm lấy doanh thu của 1 ngày cụ thể
@@ -335,37 +337,34 @@ async def get_today_pending_orders_count() -> int:
 
 
 # hàm lấy doanh thu theo tháng trong một năm
-
-
 async def get_monthly_revenue(year: int | None = None) -> List[Dict]:
     """
-    Trả về doanh thu từng tháng trong một năm.
+    Trả về doanh thu từng tháng trong một năm (chỉ các đơn hàng Delivered).
     Nếu year=None, lấy tất cả các năm.
     """
-    match_stage = {}
+    match_conditions = {"Status": "Delivered"}  # Chỉ lấy đơn hàng Delivered
     if year:
-        match_stage["$match"] = {
-            "OrderDate": {"$gte": datetime(year, 1, 1), "$lt": datetime(year + 1, 1, 1)}
+        match_conditions["OrderDate"] = {
+            "$gte": datetime(year, 1, 1),
+            "$lt": datetime(year + 1, 1, 1)
         }
 
-    pipeline = []
-    if match_stage:
-        pipeline.append(match_stage)
+    pipeline = [
+        {"$match": match_conditions} if match_conditions else None,
+        {
+            "$group": {
+                "_id": {
+                    "year": {"$year": "$OrderDate"},
+                    "month": {"$month": "$OrderDate"},
+                },
+                "revenue": {"$sum": "$TotalAmount"},
+            }
+        },
+        {"$sort": SON([("_id.year", 1), ("_id.month", 1)])},
+    ]
 
-    pipeline.extend(
-        [
-            {
-                "$group": {
-                    "_id": {
-                        "year": {"$year": "$OrderDate"},
-                        "month": {"$month": "$OrderDate"},
-                    },
-                    "revenue": {"$sum": "$TotalAmount"},
-                }
-            },
-            {"$sort": SON([("_id.year", 1), ("_id.month", 1)])},
-        ]
-    )
+    # Loại bỏ None nếu pipeline[0] = None
+    pipeline = [stage for stage in pipeline if stage is not None]
 
     results = await Order.aggregate(pipeline).to_list(None)
 
