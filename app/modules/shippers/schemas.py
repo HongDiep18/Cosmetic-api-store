@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import List, Optional
 from datetime import datetime
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field
 from beanie import PydanticObjectId
 
 
@@ -28,18 +28,17 @@ class ShipperUpdate(BaseModel):
     Phone: Optional[str] = None
 
 
-class ShipperOut(ShipperBase):
-    ShipperID: Optional[PydanticObjectId]
-    CreatedAt: datetime
-    UpdatedAt: datetime
+class ShipperOut(BaseModel):
+    _id: str
+    email: EmailStr
+    role: str
+    status: str
+    profile: dict  # Profile with fullName, phone
+    createdAt: datetime
+    updatedAt: datetime
 
     class Config:
         from_attributes = True
-
-    @field_validator("ShipperID", mode="before")
-    @classmethod
-    def cast_id(cls, v):
-        return str(v) if v else None
 
 
 class OrderItemDetail(BaseModel):

@@ -67,8 +67,11 @@ async def delete_category(category_id: str) -> bool:
 
 
 async def list_products_by_category(categoryId: str) -> List[Product]:
-    return (
-        await Product.find_many(Product.CategoryID == categoryId)
-        .sort("CreatedAt")
-        .to_list()
-    )
+    from bson import ObjectId
+    if ObjectId.is_valid(categoryId):
+        return (
+            await Product.find_many(Product.category.categoryId == ObjectId(categoryId))
+            .sort("createdAt")
+            .to_list()
+        )
+    return []

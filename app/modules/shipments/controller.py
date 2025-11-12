@@ -89,7 +89,7 @@ async def get_all_shipments_with_details():
         pipeline = [
             {
                 "$lookup": {
-                    "from": "shippers",
+                    "from": "accounts",
                     "localField": "ShipperID",
                     "foreignField": "_id",
                     "as": "shipper",
@@ -104,7 +104,7 @@ async def get_all_shipments_with_details():
                     "EstimatedDeliveryDate": 1,
                     "ActualDeliveryDate": 1,
                     "Status": 1,
-                    "ShipperName": "$shipper.FullName",
+                    "ShipperName": "$shipper.profile.fullName",
                     "_id": 0,
                 }
             },

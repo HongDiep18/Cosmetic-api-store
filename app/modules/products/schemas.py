@@ -1,42 +1,35 @@
+# -*- coding: utf-8 -*-
 from __future__ import annotations
 from typing import Optional
 from datetime import datetime
-from pydantic import BaseModel, Field, field_validator
-from bson import ObjectId
+from pydantic import BaseModel, Field
+from beanie import PydanticObjectId
+
+
+class CategoryEmbeddedSchema(BaseModel):
+    categoryId: str
+    name: str
+
+
+class BrandEmbeddedSchema(BaseModel):
+    brandId: str
+    name: str
 
 
 class ProductBase(BaseModel):
-    ProductName: str
-    Brand: Optional[str] = None
-    Description: str
-    Price: float = Field(ge=0)
-    OriginalPrice: Optional[float] = Field(default=None, ge=0)
-    Stock: int = Field(ge=0)
-    Status: str = "Active"
-    Image: Optional[str] = None
-    CategoryID: str
-    CategoryName: Optional[str] = None
-
-    @field_validator("CategoryID", mode="before")
-    @classmethod
-    def convert_category_id(cls, v):
-        print(f"🔍 Validating CategoryID: {v}")
-        # Chuyển đổi ObjectId sang string nếu cần
-        if isinstance(v, ObjectId):
-            return str(v)
-        if isinstance(v, str):
-            raw = v.strip().strip('"').strip("'")
-            # print(f"🔍 Processed CategoryID: {raw}")
-            if raw.lower() in {"undefined", "null", ""}:
-                raise ValueError("CategoryID is required")
-            return raw
-        print(f"🔍 CategoryID after validation: {v}")
-        return v
-
-    Rating: Optional[float] = Field(default=0.0, ge=0, le=5)
-    ReviewCount: Optional[int] = Field(default=0, ge=0)
-    IsFeatured: Optional[bool] = False
-    IsNew: Optional[bool] = False
+    productName: str
+    description: str
+    price: float = Field(ge=0)
+    originalPrice: Optional[float] = Field(default=None, ge=0)
+    stock: int = Field(ge=0)
+    status: str = Field(default="available")
+    image: Optional[str] = None
+    rating: Optional[float] = Field(default=0.0, ge=0, le=5)
+    reviewCount: Optional[int] = Field(default=0, ge=0)
+    isFeatured: Optional[bool] = False
+    isNew: Optional[bool] = False
+    category: CategoryEmbeddedSchema
+    brand: Optional[BrandEmbeddedSchema] = None
 
 
 class ProductCreate(ProductBase):
@@ -44,37 +37,29 @@ class ProductCreate(ProductBase):
 
 
 class ProductUpdate(BaseModel):
-    ProductName: Optional[str] = None
-    Brand: Optional[str] = None
-    Description: Optional[str] = None
-    Price: Optional[float] = Field(default=None, ge=0)
-    OriginalPrice: Optional[float] = Field(default=None, ge=0)
-    Stock: Optional[int] = Field(default=None, ge=0)
-    Status: Optional[str] = None
-    Image: Optional[str] = None
-    CategoryID: Optional[str] = None
-    CategoryName: Optional[str] = None
-    Rating: Optional[float] = Field(default=None, ge=0, le=5)
-    ReviewCount: Optional[int] = Field(default=None, ge=0)
-    IsFeatured: Optional[bool] = None
-    IsNew: Optional[bool] = None
+    productName: Optional[str] = None
+    description: Optional[str] = None
+    price: Optional[float] = Field(default=None, ge=0)
+    originalPrice: Optional[float] = Field(default=None, ge=0)
+    stock: Optional[int] = Field(default=None, ge=0)
+    status: Optional[str] = None
+    image: Optional[str] = None
+    rating: Optional[float] = Field(default=None, ge=0, le=5)
+    reviewCount: Optional[int] = Field(default=None, ge=0)
+    isFeatured: Optional[bool] = None
+    isNew: Optional[bool] = None
+    category: Optional[CategoryEmbeddedSchema] = None
+    brand: Optional[BrandEmbeddedSchema] = None
 
 
 class ProductOut(ProductBase):
     id: str = Field(alias="_id")
-    CreatedAt: datetime
-    UpdatedAt: datetime
+    createdAt: datetime
+    updatedAt: datetime
 
     class Config:
         from_attributes = True
         populate_by_name = True
-
-    @field_validator("id", mode="before")
-    @classmethod
-    def cast_id(cls, v):
-        if v is None:
-            raise ValueError("id is None")
-        return str(v)
 
 
 class PaginatedResponse(BaseModel):

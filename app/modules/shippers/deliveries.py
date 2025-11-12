@@ -7,7 +7,7 @@ from fastapi import HTTPException, status
 from app.modules.shipments.model import Shipment
 from motor.motor_asyncio import AsyncIOMotorClient
 from app.core.config import settings
-from app.modules.users.model import User
+from app.modules.auth.model import Account
 from app.modules.products.model import Product
 from app.modules.shippers.schemas import (
     DeliveryDetailsOut,
@@ -105,15 +105,15 @@ async def get_delivery_details(
                 detail=f"Order not found with ID: {shipment_id}. Please verify the ID is correct.",
             )
 
-        # Load customer (UserID may be ObjectId)
+        # Load customer (UserID đã được migration thành Account._id)
         if not order.get("UserID"):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Order has no associated user ID",
             )
 
-        customer = await User.get(order.get("UserID"))
-        if not customer:
+        customer = await Account.get(order.get("UserID"))
+        if not customer or customer.role != "User":
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Customer not found with ID: {order.get('UserID')}",
@@ -197,8 +197,8 @@ async def get_delivery_details(
             ShippingAddress=order.get("ShippingAddress", ""),
             TotalAmount=float(order.get("TotalAmount", 0.0)),
             OrderStatus=order.get("Status", "Unknown"),
-            CustomerName=getattr(customer, "FullName", ""),
-            CustomerPhone=getattr(customer, "Phone", "N/A") or "N/A",
+            CustomerName=customer.profile.fullName if customer.profile else "",
+            CustomerPhone=customer.profile.phone if customer.profile else "N/A",
             Items=items,
             CODAmount=cod_amount,
             PaymentMethod=payment_method,
@@ -255,7 +255,7 @@ async def list_deliveries_by_shipper(
         {"$unwind": "$order"},
         {
             "$lookup": {
-                "from": "users",
+                "from": "accounts",
                 "localField": "order.UserID",
                 "foreignField": "_id",
                 "as": "user",
@@ -278,8 +278,8 @@ async def list_deliveries_by_shipper(
                 "ShipmentID": {"$toString": "$_id"},
                 "OrderID": {"$toString": "$order._id"},
                 "TrackingNumber": {"$ifNull": ["$TrackingNumber", ""]},
-                "CustomerName": {"$ifNull": ["$user.FullName", ""]},
-                "CustomerPhone": {"$ifNull": ["$user.Phone", ""]},
+                "CustomerName": {"$ifNull": ["$user.profile.fullName", ""]},
+                "CustomerPhone": {"$ifNull": ["$user.profile.phone", ""]},
                 "ShippingAddress": {"$ifNull": ["$order.ShippingAddress", ""]},
                 "CODAmount": {
                     "$cond": {

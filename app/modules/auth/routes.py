@@ -12,8 +12,6 @@ from app.modules.auth.schemas import (
     RegisterRequest,
     ResetPasswordRequest,
     Token,
-    RoleCreate,
-    RoleOut,
     AccountOut,
 )
 from app.modules.auth.controller import (
@@ -26,22 +24,19 @@ from app.modules.auth.controller import (
     set_account_status,
     create_login_token,
 )
-from app.modules.users.schemas import UserOut, UserWithEmailOut
-from app.modules.auth.model import Account, Role
-from app.modules.users.model import User
-from bson import ObjectId
+from app.modules.auth.model import Account
 
 router = APIRouter(tags=["Auth"])
 
 
 # ------------------- PUBLIC ROUTES -------------------
-@router.post("/register", response_model=UserOut)
+@router.post("/register", response_model=AccountOut)
 async def register(data: RegisterRequest):
     print("📩 Dữ liệu nhận được:", data.model_dump())
 
     try:
-        # Gọi controller tạo tài khoản + user
-        user = await register_user(
+        # Gọi controller tạo tài khoản
+        account_dict = await register_user(
             Email=data.Email,
             Password=data.Password,
             FullName=data.FullName,
@@ -49,21 +44,11 @@ async def register(data: RegisterRequest):
             Address=data.Address,
         )
 
-        # Convert user sang dict
-        if hasattr(user, "to_dict"):
-            user_dict = user.to_dict()
-        elif hasattr(user, "model_dump"):
-            user_dict = user.model_dump()
-        elif isinstance(user, dict):
-            user_dict = user
-        else:
-            raise TypeError(f"❌ Không biết cách convert kiểu {type(user)} sang dict")
-
-        print("🧾 User dict trả về:", user_dict)
+        print("🧾 Account dict trả về:", account_dict)
 
         # Validate output schema
-        validated_user = UserOut.model_validate(user_dict)
-        return validated_user
+        validated_account = AccountOut.model_validate(account_dict)
+        return validated_account
 
     except Exception as e:
         print("❌ ValidationError chi tiết:")
@@ -81,22 +66,13 @@ async def register(data: RegisterRequest):
 async def login_for_access_token(payload: LoginRequest):
     print("📩 Raw payload:", payload)
 
-    (
-        account,
-        user,
-    ) = await authenticate_user(payload.Email, payload.Password)
+    account = await authenticate_user(payload.Email, payload.Password)
 
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
 
-    role_name = "User"  # default
-    if getattr(account, "RoleID", None):
-        role = await Role.get(account.RoleID)
-        if role and role.RoleName:
-            role_name = role.RoleName
-
-    print(f"🎭 Role name cho account {account.Email}: {role_name}")
-    access_token = create_login_token(account, role_name)
+    print(f"🎭 Role name cho account {account.email}: {account.role}")
+    access_token = create_login_token(account)
     return Token(AccessToken=access_token, RefreshToken=None)
 
 
@@ -123,19 +99,13 @@ async def refresh_token(_: RefreshTokenRequest):
 # ------------------- AUTH ROUTES -------------------
 
 
-@router.get("/me", response_model=UserWithEmailOut)
+@router.get("/me", response_model=AccountOut)
 async def read_me(current_account: Account = Depends(get_current_account)):
-    user = await User.find_one(User.AccountID == ObjectId(current_account.id))
+    if not current_account:
+        raise HTTPException(status_code=404, detail="Account not found")
 
-    if not user:
-        print(" Không tìm thấy user với AccountID:", current_account.id)
-        raise HTTPException(status_code=404, detail="User not found")
-
-    print("Tìm thấy user:", user.FullName)
-    user_dict = user.to_dict() if hasattr(user, "to_dict") else user.dict()
-    user_dict["Email"] = current_account.Email
-
-    return UserWithEmailOut.model_validate(user_dict)
+    print(f"✅ Found account: {current_account.profile.fullName}")
+    return AccountOut.model_validate(current_account.model_dump())
 
 
 @router.post("/logout")
@@ -155,48 +125,7 @@ async def change_password_endpoint(
 # ------------------- ADMIN ROUTES -------------------
 
 
-@router.post(
-    "/roles", response_model=RoleOut, dependencies=[Depends(require_admin_account)]
-)
-async def create_role(payload: RoleCreate):
-    role = Role(RoleName=payload.RoleName)
-    await role.insert()
-    return RoleOut.model_validate(role.to_dict())
-
-
-@router.get(
-    "/roles",
-    response_model=list[RoleOut],
-    dependencies=[Depends(require_admin_account)],
-)
-async def list_roles():
-    roles = await Role.find_all().to_list()
-    return [RoleOut.model_validate(r.to_dict()) for r in roles]
-
-
-@router.put(
-    "/roles/{role_id}",
-    response_model=RoleOut,
-    dependencies=[Depends(require_admin_account)],
-)
-async def update_role(role_id: str, payload: RoleCreate):
-    role = await Role.get(role_id)
-    if not role:
-        raise HTTPException(status_code=404, detail="Role not found")
-
-    role.RoleName = payload.RoleName
-    await role.save()
-    return RoleOut.model_validate(role.to_dict())
-
-
-@router.delete(
-    "/roles/{role_id}", status_code=204, dependencies=[Depends(require_admin_account)]
-)
-async def delete_role(role_id: str):
-    role = await Role.get(role_id)
-    if not role:
-        raise HTTPException(status_code=404, detail="Role not found")
-    await role.delete()
+# Role routes removed - roles are now embedded as strings in Account
 
 
 @router.get(
@@ -206,7 +135,7 @@ async def delete_role(role_id: str):
 )
 async def list_accounts():
     accounts = await Account.find_all().to_list()
-    return [AccountOut.model_validate(a.to_dict()) for a in accounts]
+    return [AccountOut.model_validate(a.model_dump()) for a in accounts]
 
 
 @router.get(
@@ -218,7 +147,7 @@ async def get_account_detail(account_id: str):
     account = await Account.get(account_id)
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
-    return AccountOut.model_validate(account.to_dict())
+    return AccountOut.model_validate(account.model_dump())
 
 
 @router.patch(
@@ -244,12 +173,12 @@ async def update_account_status(account_id: str, payload: dict):
     dependencies=[Depends(require_admin_account)],
 )
 async def update_account_role(account_id: str, payload: dict):
-    role_id = payload.get("RoleId")
-    if not role_id:
-        raise HTTPException(status_code=400, detail="RoleId is required")
+    role_name = payload.get("role") or payload.get("RoleName")
+    if not role_name:
+        raise HTTPException(status_code=400, detail="role is required")
 
-    account = await set_account_role(account_id, role_id)
+    account = await set_account_role(account_id, role_name)
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
 
-    return AccountOut.model_validate(account.to_dict())
+    return AccountOut.model_validate(account.model_dump())

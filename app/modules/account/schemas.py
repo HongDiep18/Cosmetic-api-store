@@ -4,22 +4,21 @@ from pydantic import BaseModel, EmailStr
 from typing import Optional
 
 
+class ProfileOut(BaseModel):
+    fullName: str
+    phone: str
+    address: Optional[str] = None
+
 
 class AccountViewOut(BaseModel):
-    AccountID: str # hoặc _id nếu dùng 
-    UserID: Optional[str]
-    ShipperID: Optional[str]
-    Email:EmailStr
-    RoleName: Optional[str]
-    RoleID: Optional[str]
-    FullName: Optional[str]
-    PasswordHash: Optional[str]
-    Phone: Optional[str]
-    Status: Optional[str]
-    Address:Optional[str]
-    TotalOrders: Optional[int]
-    TotalDeliveries: Optional[int]
-    CreatedAt: Optional[datetime]
-    UpdatedAt: Optional[datetime]
-
-
+    _id: str  # AccountID
+    email: EmailStr
+    role: str  # RoleName
+    status: str
+    profile: ProfileOut
+    passwordResetToken: Optional[str] = None
+    passwordResetExpires: Optional[datetime] = None
+    createdAt: datetime
+    updatedAt: datetime
+    TotalOrders: Optional[int] = 0
+    TotalDeliveries: Optional[int] = 0

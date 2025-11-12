@@ -16,7 +16,6 @@ from app.modules.shippers.deliveries import (
     list_deliveries_by_shipper,
 )
 from app.modules.shippers.controller import (
-    create_shipper,
     create_account_shipper,
     get_shipper,
     list_shippers,
@@ -31,32 +30,20 @@ from beanie import PydanticObjectId
 router = APIRouter()
 
 
-# create shipper
-@router.post("/", response_model=ShipperOut, status_code=status.HTTP_201_CREATED)
-async def create_shipper_endpoint(
-    data: ShipperCreate,
-    # _: str = Depends(require_shipper_account),
-):
-    shipper = await create_shipper(data)
-    return ShipperOut.model_validate(shipper, from_attributes=True)
+# create shipper - removed, use create_shipper_account instead
 
 
-@router.post(
-    "",
-    response_model=ShipperOut,
-    #  status_code=status.HTTP_201_CREATED
-)
+@router.post("", response_model=ShipperOut, status_code=status.HTTP_201_CREATED)
 async def create_shipper_account(
     data: ShipperCreate,
-    # _: str = Depends(require_shipper_account),
 ):
     print("📩 Dữ liệu nhận được:", data.model_dump())
     try:
-        # Gọi controller tạo tài khoản + user
-        shipper_dict = await create_account_shipper(data)
+        # Gọi controller tạo tài khoản
+        account_dict = await create_account_shipper(data)
         # Validate output schema
-        validated_user = ShipperOut.model_validate(shipper_dict)
-        return validated_user
+        validated_shipper = ShipperOut.model_validate(account_dict)
+        return validated_shipper
 
     except Exception as e:
         print("❌ ValidationError chi tiết:")
@@ -75,7 +62,7 @@ async def create_shipper_account(
 async def list_shippers_endpoint():
     try:
         shippers = await list_shippers()
-        return [ShipperOut.model_validate(s, from_attributes=True) for s in shippers]
+        return [ShipperOut.model_validate(s.model_dump()) for s in shippers]
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -256,7 +243,7 @@ async def get_shipper_endpoint(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Shipper not found"
         )
-    return ShipperOut.model_validate(shipper, from_attributes=True)
+    return ShipperOut.model_validate(shipper.model_dump())
 
 
 @router.patch("/{shipper_id}", response_model=ShipperOut)
@@ -271,7 +258,7 @@ async def update_shipper_endpoint(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Shipper not found"
         )
-    return ShipperOut.model_validate(shipper, from_attributes=True)
+    return ShipperOut.model_validate(shipper.model_dump())
 
 
 @router.delete("/{shipper_id}", status_code=status.HTTP_204_NO_CONTENT)

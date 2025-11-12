@@ -11,7 +11,6 @@ from app.modules.orders.schemas import (
     OrderStatusUpdate,
     OrderOutCustom,
 )
-from app.modules.users.model import User
 from app.modules.auth.model import Account
 from app.modules.orders.controller import (
     create_order,
@@ -113,17 +112,18 @@ def normalize_order_for_response(order) -> dict:
 # create order
 @router.post("", response_model=OrderOut, status_code=status.HTTP_201_CREATED)
 async def create_order_endpoint(
-    data: OrderCreate, current_account: User = Depends(get_current_account)
+    data: OrderCreate, current_account: Account = Depends(get_current_account)
 ):
     try:
-        # Tìm User từ AccountID
-        user = await User.find_one(User.AccountID == current_account.AccountID)
-        if not user:
+        # Kiểm tra role phải là User
+        if current_account.role != "User":
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only users can create orders",
             )
 
-        order = await create_order(user_id=str(user.UserID), data=data)
+        # Sử dụng Account._id trực tiếp (đã là AccountID sau migration)
+        order = await create_order(user_id=str(current_account.id), data=data)
         return OrderOut.model_validate(order, from_attributes=True)
 
     except ValueError as ve:
@@ -140,15 +140,17 @@ async def create_order_endpoint(
 @router.get("/get-order", response_model=list[OrderOut])
 async def get_my_orders(current_account: Account = Depends(get_current_account)):
     try:
-        # Tìm User từ AccountID
-        user = await User.find_one(User.AccountID == current_account.AccountID)
-        if not user:
-            print(f"⚠️ User not found for AccountID={current_account.AccountID}")
+        # Kiểm tra role phải là User
+        if current_account.role != "User":
+            print(
+                f"⚠️ Account {current_account.id} is not a User (role: {current_account.role})"
+            )
             return []
 
-        user_id_str = user.id
+        # Sử dụng Account._id trực tiếp (đã là AccountID sau migration)
+        user_id_str = str(current_account.id)
         print(f"🔍 Looking for orders with UserID={user_id_str}")
-        orders = await get_user_orders(user_id_str)
+        orders = await get_user_orders(PydanticObjectId(user_id_str))
 
         if not orders:
             print(f"⚠️ No orders found for UserID={user_id_str}")
@@ -214,7 +216,7 @@ async def get_list_all_orders():
             try:
                 # Try attribute-based validation (Beanie Document)
                 results.append(OrderOutCustom.model_validate(o, from_attributes=True))
-            except Exception:
+            except Exception as e:
                 # Nếu 1 đơn nào đó bị lỗi payment hoặc validation thì log lại, bỏ qua lỗi
                 print(f"⚠️ Lỗi xử lý order {getattr(o, '_id', 'unknown')}: {e}")
                 # Vẫn thêm đơn đó nhưng không có payment

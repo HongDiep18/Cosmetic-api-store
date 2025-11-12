@@ -1,38 +1,27 @@
 from typing import Optional
 from app.modules.users.schemas import UserUpdate
-from app.modules.users.model import User
+from app.modules.auth.model import Account
 
 
-async def get_user_by_account_id(account_id: str) -> Optional[User]:
+async def get_user_by_account_id(account_id: str) -> Optional[Account]:
     """Get user by AccountID"""
-    return await User.find_one(User.AccountID == account_id)
+    account = await Account.get(account_id)
+    if account and account.role == "User":
+        return account
+    return None
 
-# TUI COMMENT TẠM
-# async def update_user_profile(
-#     user: User, full_name: str = None, phone: str = None, address: str = None
-# ) -> User:
-#     """Update user profile information"""
-#     if full_name is not None:
-#         user.FullName = full_name
-#     if phone is not None:
-#         user.Phone = phone
-#     if address is not None:
-#         user.Address = address
 
-#     await user.save()
-#     return user
-
-async def update_user_profile(user_id: str, data: UserUpdate) -> User | None:
-    user = await User.get(user_id)
-    if not user:
+async def update_user_profile(account_id: str, data: UserUpdate) -> Account | None:
+    account = await Account.get(account_id)
+    if not account or account.role != "User":
         return None
 
     if data.FullName is not None:
-        user.FullName = data.FullName
+        account.profile.fullName = data.FullName
     if data.Phone is not None:
-        user.Phone = data.Phone
+        account.profile.phone = data.Phone
     if data.Address is not None:
-        user.Address = data.Address
+        account.profile.address = data.Address
 
-    await user.save()
-    return user
+    await account.save()
+    return account

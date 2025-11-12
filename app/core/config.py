@@ -18,6 +18,12 @@ class Settings(BaseSettings):
     HOST: str = "0.0.0.0"
     PORT: int = 8000
 
+    # Gemini API key (override via env in production)
+    GEMINI_API_KEY: str = "AIzaSyARZt_mb6BF4Yf4pHba3b8rqvbRSAiWhP8"
+
+    # Groq API key for chat (free, no quota limit)
+    GROQ_API_KEY: str = "AIzaSyARZt_mb6BF4Yf4pHba3b8rqvbRSAiWhP8"
+
     # Accept unknown env vars (e.g., db_user, db_password) without failing
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -64,10 +64,10 @@ async def get_user_orders(user_id: PydanticObjectId) -> List[Order]:
         # Find orders with exact user_id string match
         orders = await Order.find({"UserID": user_id}).sort("-CreatedAt").to_list()
 
-        # Ensure each order's _id is converted to string
+        # Ensure each order's id is converted to string
         for order in orders:
-            if hasattr(order, "_id"):
-                order._id = str(order._id)
+            if hasattr(order, "id"):
+                order.id = str(order.id)
 
         return orders
     except Exception as e:
@@ -107,7 +107,10 @@ async def list_all_orders() -> List[Order]:
         print(f"list_all_orders: raw collection find error: {e}")
         return []
 
+
 async def attach_payment_info(order):
+    from app.modules.auth.model import Account
+
     try:
         order_id = order.id if isinstance(order.id, ObjectId) else ObjectId(order.id)
     except Exception:
@@ -130,7 +133,23 @@ async def attach_payment_info(order):
     order_dict["PaymentMethod"] = getattr(payment, "PaymentMethod", None)
     order_dict["PaymentStatus"] = getattr(payment, "PaymentStatus", None)
 
+    # Populate UserName từ Account
+    try:
+        user_id = order_dict.get("UserID")
+        if user_id:
+            account = await Account.get(user_id)
+            if account and account.profile:
+                order_dict["UserName"] = account.profile.fullName
+            else:
+                order_dict["UserName"] = "Unknown"
+        else:
+            order_dict["UserName"] = "Unknown"
+    except Exception as e:
+        print(f"⚠️ Lỗi populate UserName cho order {order_id}: {e}")
+        order_dict["UserName"] = "Unknown"
+
     return order_dict
+
 
 async def update_order_status(order_id: str, new_status: str) -> Optional[Order]:
     """
@@ -231,12 +250,7 @@ async def get_last_7_days_total_revenue() -> list[dict]:
 
     # Pipeline MongoDB: nhóm theo ngày với điều kiện Status = "Delivered"
     pipeline = [
-        {
-            "$match": {
-                "OrderDate": {"$gte": seven_days_ago},
-                "Status": "Delivered"
-            }
-        },
+        {"$match": {"OrderDate": {"$gte": seven_days_ago}, "Status": "Delivered"}},
         {
             "$group": {
                 "_id": {
@@ -254,7 +268,9 @@ async def get_last_7_days_total_revenue() -> list[dict]:
 
     # Chuyển kết quả aggregate thành dict: "YYYY-MM-DD" -> revenue
     revenue_dict = {
-        f"{r['_id']['year']}-{r['_id']['month']:02d}-{r['_id']['day']:02d}": r["revenue"]
+        f"{r['_id']['year']}-{r['_id']['month']:02d}-{r['_id']['day']:02d}": r[
+            "revenue"
+        ]
         for r in results
     }
 
@@ -271,6 +287,7 @@ async def get_last_7_days_total_revenue() -> list[dict]:
         )
 
     return daily_revenue
+
 
 # lấy doanh thu từng ngày
 # Hàm lấy doanh thu của 1 ngày cụ thể
@@ -346,7 +363,7 @@ async def get_monthly_revenue(year: int | None = None) -> List[Dict]:
     if year:
         match_conditions["OrderDate"] = {
             "$gte": datetime(year, 1, 1),
-            "$lt": datetime(year + 1, 1, 1)
+            "$lt": datetime(year + 1, 1, 1),
         }
 
     pipeline = [

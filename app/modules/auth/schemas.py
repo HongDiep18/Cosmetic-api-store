@@ -6,6 +6,7 @@ from pydantic import BaseModel, EmailStr, Field
 # 🪪 TOKEN SCHEMAS
 # =========================================
 
+
 class Token(BaseModel):
     AccessToken: str
     RefreshToken: str | None = None
@@ -19,6 +20,7 @@ class TokenPayload(BaseModel):
 # =========================================
 # 👤 AUTH REQUEST SCHEMAS
 # =========================================
+
 
 class RegisterRequest(BaseModel):
     Email: EmailStr = Field(..., alias="Email")
@@ -65,6 +67,7 @@ class ChangePasswordRequest(BaseModel):
 # 👑 ROLE & ACCOUNT OUTPUT SCHEMAS
 # =========================================
 
+
 class RoleCreate(BaseModel):
     RoleName: str = Field(..., min_length=1, alias="RoleName")
 
@@ -85,13 +88,26 @@ class RoleOut(BaseModel):
     }
 
 
+class ProfileOut(BaseModel):
+    fullName: str
+    phone: str
+    address: str | None = None
+
+    model_config = {
+        "from_attributes": True,
+    }
+
+
 class AccountOut(BaseModel):
-    AccountID: str
-    Email: EmailStr
-    RoleID: str
-    Status: str
-    CreatedAt: datetime
-    UpdatedAt: datetime
+    _id: str
+    email: EmailStr
+    role: str
+    status: str
+    profile: ProfileOut
+    passwordResetToken: str | None = None
+    passwordResetExpires: datetime | None = None
+    createdAt: datetime
+    updatedAt: datetime
 
     model_config = {
         "from_attributes": True,
@@ -100,10 +116,15 @@ class AccountOut(BaseModel):
     def to_dict(self):
         # Trả về dict từ attributes
         return {
-            "AccountID": self.AccountID,
-            "Email": self.Email,
-            "RoleID": self.RoleID,
-            "Status": self.Status,
-            "CreatedAt": self.CreatedAt,
-            "UpdatedAt": self.UpdatedAt,
+            "_id": self._id,
+            "email": self.email,
+            "role": self.role,
+            "status": self.status,
+            "profile": self.profile.model_dump()
+            if isinstance(self.profile, ProfileOut)
+            else self.profile,
+            "passwordResetToken": self.passwordResetToken,
+            "passwordResetExpires": self.passwordResetExpires,
+            "createdAt": self.createdAt,
+            "updatedAt": self.updatedAt,
         }

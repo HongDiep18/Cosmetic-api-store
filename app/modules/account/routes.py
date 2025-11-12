@@ -15,8 +15,8 @@ router = APIRouter(tags=["Account"])
             response_model=list[AccountViewOut],
             )
 async def list_account():
-    Account  = await get_account_custom()
-    return Account
+    accounts = await get_account_custom()
+    return accounts
 
 
 

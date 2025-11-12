@@ -5,7 +5,7 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from beanie import PydanticObjectId
 from app.core.config import settings
-from app.modules.auth.model import Account, Role
+from app.modules.auth.model import Account
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
@@ -41,8 +41,7 @@ async def get_current_account(token: str = Depends(oauth2_scheme)) -> Account:
 async def require_admin_account(
     current_account: Account = Depends(get_current_account),
 ) -> Account:
-    role = await Role.get(current_account.RoleID)
-    if not role or role.RoleName.lower() != "admin":
+    if not current_account or current_account.role.lower() != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Admin privilege required"
         )
