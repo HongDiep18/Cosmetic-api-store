@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Query, status
+from datetime import datetime
 
 from app.modules.brands.schemas import BrandCreate, BrandOut, BrandUpdate
 from app.modules.brands.controller import (
@@ -26,7 +27,24 @@ async def list_brands_endpoint(
     limit: int = Query(200, ge=1, le=500),
 ):
     brands, _ = await list_brands(page=page, limit=limit)
-    return [BrandOut.model_validate(b, from_attributes=True) for b in brands]
+
+    normalized: list[BrandOut] = []
+    for item in brands:
+        if isinstance(item, dict):
+            normalized.append(BrandOut(**item))
+        else:
+            created_at = getattr(item, "CreatedAt", None) or datetime.utcnow()
+            updated_at = getattr(item, "UpdatedAt", None) or created_at
+            normalized.append(
+                BrandOut(
+                    id=str(getattr(item, "id", getattr(item, "_id", ""))),
+                    BrandName=getattr(item, "BrandName", ""),
+                    CreatedAt=created_at,
+                    UpdatedAt=updated_at,
+                )
+            )
+
+    return normalized
 
 
 @router.get("/{brand_id}", response_model=BrandOut)

@@ -12,12 +12,12 @@ async def init_db() -> None:
     from app.modules.users.model import User
     from app.modules.products.model import Product
     from app.modules.orders.model import Order
-    from app.modules.categories.model import Category
+    # from app.modules.categories.model import Category
     from app.modules.reviews.model import Review
     from app.modules.auth.model import Role, Account
     from app.modules.shippers.model import Shipper
     from app.modules.shipments.model import Shipment
-    from app.modules.brands.model import Brand
+    # from app.modules.brands.model import Brand
     from app.modules.payments.model import Payment
 
     await beanie_init(

@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from datetime import datetime
 
 from app.core.deps import require_admin_account
 from app.modules.categories.constants import CATEGORY_NOT_FOUND
@@ -6,6 +7,7 @@ from app.modules.categories.schemas import (
     CategoryCreate,
     CategoryOut,
     CategoryUpdate,
+    CategoryListItem,
 )
 from app.modules.categories.controller import (
     create_category,
@@ -33,14 +35,32 @@ async def create_category_endpoint(data: CategoryCreate):
     return CategoryOut.model_validate(category, from_attributes=True)
 
 
-@router.get("", response_model=list[CategoryOut])  # Không có trailing slash
-@router.get("/", response_model=list[CategoryOut])  # Có trailing slash
+@router.get("", response_model=list[CategoryListItem])  # Không có trailing slash
+@router.get("/", response_model=list[CategoryListItem])  # Có trailing slash
 async def list_categories_endpoint(
     page: int = Query(1, ge=1),
     limit: int = Query(50, ge=1, le=200),
 ):
     categories, _ = await list_categories(page=page, limit=limit)
-    return [CategoryOut.model_validate(c, from_attributes=True) for c in categories]
+    normalized: list[CategoryListItem] = []
+
+    for item in categories:
+        if isinstance(item, dict):
+            normalized.append(CategoryListItem(**item))
+        else:
+            created_at = getattr(item, "CreatedAt", None) or datetime.utcnow()
+            updated_at = getattr(item, "UpdatedAt", None) or created_at
+            normalized.append(
+                CategoryListItem(
+                    CategoryID=str(getattr(item, "id", getattr(item, "_id", ""))),
+                    CategoryName=getattr(item, "CategoryName", ""),
+                    Description=getattr(item, "Description", None),
+                    CreatedAt=created_at,
+                    UpdatedAt=updated_at,
+                )
+            )
+
+    return normalized
 
 
 @router.get("/{category_id}", response_model=CategoryOut)

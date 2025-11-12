@@ -19,6 +19,21 @@ class CategoryUpdate(BaseModel):
     Description: Optional[str] = None
 
 
+class CategoryListItem(BaseModel):
+    CategoryID: str
+    CategoryName: str
+    Description: Optional[str] = None
+    CreatedAt: datetime
+    UpdatedAt: datetime
+
+    @field_validator("CategoryID", mode="before")
+    @classmethod
+    def cast_category_id(cls, v):
+        if v is None:
+            raise ValueError("CategoryID is None")
+        return str(v)
+
+
 class CategoryOut(CategoryBase):
     id: str = Field(alias="_id")
     CreatedAt: datetime
