@@ -62,8 +62,45 @@ async def create_shipper_account(
 async def list_shippers_endpoint():
     try:
         shippers = await list_shippers()
-        return [ShipperOut.model_validate(s.model_dump()) for s in shippers]
+        print(f"✅ [list_shippers_endpoint] Found {len(shippers)} shippers")
+        result = []
+        for s in shippers:
+            # Extract ID directly from Beanie Document object (PydanticObjectId)
+            # s.id is already a PydanticObjectId, convert to string for proper ObjectId representation
+            account_id = str(s.id) if s.id else None
+
+            if not account_id:
+                print(f"⚠️ WARNING: Account {s.email} has no ID! Skipping...")
+                continue
+
+            print(f"🔍 Shipper: {s.email}, ID: {account_id}, type: {type(account_id)}")
+
+            # Map Account structure to ShipperOut
+            # Account has: id (PydanticObjectId), email, role, status, profile (with fullName, phone), createdAt, updatedAt
+            shipper_out_dict = {
+                "_id": account_id,  # Use string representation of PydanticObjectId
+                "email": s.email,
+                "role": s.role,
+                "status": s.status,
+                "profile": {
+                    "fullName": s.profile.fullName,
+                    "phone": s.profile.phone,
+                },
+                "createdAt": s.createdAt,
+                "updatedAt": s.updatedAt,
+            }
+            print(f"📤 Mapped shipper data with _id={account_id}")
+            shipper_out = ShipperOut.model_validate(shipper_out_dict)
+            result.append(shipper_out)
+        print(
+            f"✅ [list_shippers_endpoint] Returning {len(result)} shippers with valid IDs"
+        )
+        return result
     except Exception as e:
+        print(f"❌ Error in list_shippers_endpoint: {str(e)}")
+        import traceback
+
+        traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error retrieving shippers: {str(e)}",
@@ -135,24 +172,24 @@ async def update_delivery_status_endpoint(
     The order_id can be either the OrderID or ShipmentID (which will be resolved to OrderID).
 
     Valid status values:
-    - Processing
-    - Shipped
-    - Delivered
-    - Failed
-    - Cancelled
+    - Pending (Đã đặt)
+    - Confirmed (Đã xác nhận)
+    - Processing (Đang xử lý)
+    - Shipped (Đã giao cho vận chuyển)
+    - Delivered (Đã giao)
+    - Cancelled (Đã hủy)
     """
     try:
         new_status = status_update.status.strip()
 
-        # Validate status is one of the allowed values
+        # Validate status is one of the allowed values (6 statuses)
         allowed_statuses = [
-            "Pending",
-            "Confirmed",
-            "Processing",
-            "Shipped",
-            "Delivered",
-            "Failed",
-            "Cancelled",
+            "Pending",  # Đã đặt
+            "Confirmed",  # Đã xác nhận
+            "Processing",  # Đang xử lý
+            "Shipped",  # Đã giao cho vận chuyển
+            "Delivered",  # Đã giao
+            "Cancelled",  # Đã hủy
         ]
         if new_status not in allowed_statuses:
             # Try to match case-insensitively

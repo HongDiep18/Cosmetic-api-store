@@ -55,7 +55,31 @@ async def get_shipper(account_id: str) -> Account | None:
 
 
 async def list_shippers() -> list[Account]:
-    return await Account.find(Account.role == "Shipper").to_list()
+    print("[list_shippers] Querying for shippers...")
+    # Debug: Fetch all accounts first to see what we have
+    all_accounts = await Account.find().to_list()
+    print(f"[list_shippers] Total accounts in DB: {len(all_accounts)}")
+    for acc in all_accounts:
+        print(f"  - Email: {acc.email}, Role: '{acc.role}' (type: {type(acc.role)})")
+
+    # Query for shippers
+    shippers = await Account.find(Account.role == "Shipper").to_list()
+    print(f"[list_shippers] Found {len(shippers)} shippers with role == 'Shipper'")
+
+    if not shippers:
+        print(
+            "[list_shippers] No shippers found with role 'Shipper', trying case-insensitive match..."
+        )
+        # Try case-insensitive match if needed
+        all_potential = await Account.find().to_list()
+        shippers = [
+            acc for acc in all_potential if acc.role and acc.role.lower() == "shipper"
+        ]
+        print(
+            f"[list_shippers] Found {len(shippers)} shippers after case-insensitive match"
+        )
+
+    return shippers
 
 
 async def update_shipper(account_id: str, data: ShipperUpdate) -> Account | None:

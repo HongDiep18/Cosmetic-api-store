@@ -1,1 +1,1 @@
-ORDER_STATUSES = ("pending", "processing", "shipped", "delivered", "cancelled")
+ORDER_STATUSES = ("Pending", "Confirmed", "Processing", "Shipped", "Delivered", "Cancelled")

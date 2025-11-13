@@ -106,18 +106,63 @@ async def get_delivery_details(
             )
 
         # Load customer (UserID đã được migration thành Account._id)
-        if not order.get("UserID"):
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Order has no associated user ID",
-            )
+        user_id_raw = order.get("UserID")
+        print(f"DEBUG: UserID from order: {user_id_raw}, type: {type(user_id_raw)}")
 
-        customer = await Account.get(order.get("UserID"))
-        if not customer or customer.role != "User":
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Customer not found with ID: {order.get('UserID')}",
-            )
+        customer = None
+        customer_name = ""
+        customer_phone = "N/A"
+
+        if user_id_raw:
+            try:
+                # Convert to PydanticObjectId if needed
+                if isinstance(user_id_raw, ObjectId):
+                    user_id = PydanticObjectId(str(user_id_raw))
+                else:
+                    user_id = PydanticObjectId(user_id_raw)
+
+                print(f"DEBUG: Converted user_id: {user_id}")
+                customer = await Account.get(user_id)
+                print(f"DEBUG: Found customer: {customer}")
+
+                if customer:
+                    # Try to get profile from Beanie model
+                    if hasattr(customer, "profile") and customer.profile:
+                        # Handle both Pydantic model and dict
+                        if isinstance(customer.profile, dict):
+                            customer_name = customer.profile.get("fullName", "") or ""
+                            customer_phone = customer.profile.get("phone", "") or "N/A"
+                        else:
+                            # Pydantic model
+                            customer_name = getattr(customer.profile, "fullName", "") or ""
+                            customer_phone = getattr(customer.profile, "phone", "") or "N/A"
+                        print(f"DEBUG: Got from Beanie model - name: {customer_name}, phone: {customer_phone}")
+            except Exception as e:
+                print(f"⚠️ Error fetching customer via Beanie: {e}")
+                traceback.print_exc()
+            
+            # Fallback: Try to get from database directly if Beanie failed or data is empty
+            if not customer_name or not customer_phone or customer_phone == "N/A":
+                try:
+                    account_doc = await db["accounts"].find_one(
+                        {"_id": ObjectId(str(user_id_raw))}
+                    )
+                    print(f"DEBUG: account_doc from db: {account_doc}")
+                    if account_doc:
+                        profile = account_doc.get("profile", {})
+                        if profile:
+                            if not customer_name:
+                                customer_name = profile.get("fullName", "") or ""
+                            if not customer_phone or customer_phone == "N/A":
+                                customer_phone = profile.get("phone", "") or "N/A"
+                            print(f"DEBUG: Got from raw DB - name: {customer_name}, phone: {customer_phone}")
+                except Exception as e2:
+                    print(f"⚠️ Error fetching account from db: {e2}")
+                    traceback.print_exc()
+                    if not customer_name:
+                        customer_name = "Unknown"
+                    if not customer_phone or customer_phone == "N/A":
+                        customer_phone = "N/A"
 
         # Payment and COD calculation
         payment = await db["payments"].find_one({"OrderID": str(order.get("_id"))})
@@ -161,8 +206,9 @@ async def get_delivery_details(
                             product = None
 
                     if product:
+                        # Product model uses `productName` field
                         product_name = getattr(
-                            product, "ProductName", "Unknown Product"
+                            product, "productName", "Unknown Product"
                         )
 
                 items.append(
@@ -189,7 +235,35 @@ async def get_delivery_details(
                 traceback.print_exc()
                 continue
 
-        # Build response
+        # Build response (use customer_name/customer_phone from above logic)
+        # At this point, customer_name and customer_phone should already be populated
+        # from the logic above, but ensure we have fallback values
+        final_customer_name = customer_name if customer_name else "Unknown"
+        final_customer_phone = customer_phone if customer_phone and customer_phone != "N/A" else "N/A"
+        
+        # Final check: if still empty, try one more time from customer object
+        if (not final_customer_name or final_customer_name == "Unknown") and customer:
+            try:
+                if hasattr(customer, "profile") and customer.profile:
+                    if isinstance(customer.profile, dict):
+                        final_customer_name = customer.profile.get("fullName", "Unknown")
+                    else:
+                        final_customer_name = getattr(customer.profile, "fullName", "Unknown")
+            except Exception:
+                pass
+        
+        if (not final_customer_phone or final_customer_phone == "N/A") and customer:
+            try:
+                if hasattr(customer, "profile") and customer.profile:
+                    if isinstance(customer.profile, dict):
+                        final_customer_phone = customer.profile.get("phone", "N/A")
+                    else:
+                        final_customer_phone = getattr(customer.profile, "phone", "N/A")
+            except Exception:
+                pass
+        
+        print(f"DEBUG: Final customer info - name: {final_customer_name}, phone: {final_customer_phone}")
+        
         response = DeliveryDetailsOut(
             TrackingNumber=tracking_number,
             ShipmentStatus=shipment_status,
@@ -197,8 +271,8 @@ async def get_delivery_details(
             ShippingAddress=order.get("ShippingAddress", ""),
             TotalAmount=float(order.get("TotalAmount", 0.0)),
             OrderStatus=order.get("Status", "Unknown"),
-            CustomerName=customer.profile.fullName if customer.profile else "",
-            CustomerPhone=customer.profile.phone if customer.profile else "N/A",
+            CustomerName=final_customer_name,
+            CustomerPhone=final_customer_phone,
             Items=items,
             CODAmount=cod_amount,
             PaymentMethod=payment_method,
@@ -319,7 +393,7 @@ async def list_deliveries_by_shipper(
                         product = await Product.get(product_obj_id)
                         if product:
                             product_name = getattr(
-                                product, "ProductName", "Unknown Product"
+                                product, "productName", "Unknown Product"
                             )
                 except Exception:
                     pass

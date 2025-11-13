@@ -29,7 +29,7 @@ class ShipperUpdate(BaseModel):
 
 
 class ShipperOut(BaseModel):
-    _id: str
+    id: str = Field(alias="_id")
     email: EmailStr
     role: str
     status: str
@@ -39,6 +39,7 @@ class ShipperOut(BaseModel):
 
     class Config:
         from_attributes = True
+        populate_by_name = True  # Allow both 'id' and '_id' for input
 
 
 class OrderItemDetail(BaseModel):

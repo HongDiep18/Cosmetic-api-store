@@ -7,13 +7,12 @@ from enum import Enum
 
 
 class OrderStatus(str, Enum):
-    PENDING = "Pending"
-    CONFIRMED = "Confirmed"
-    PROCESSING = "Processing"
-    SHIPPED = "Shipped"
-    DELIVERED = "Delivered"
-    FAILED = "Failed"
-    CANCELLED = "Cancelled"
+    PENDING = "Pending"  # Đã đặt
+    CONFIRMED = "Confirmed"  # Đã xác nhận
+    PROCESSING = "Processing"  # Đang xử lý
+    SHIPPED = "Shipped"  # Đã giao cho vận chuyển
+    DELIVERED = "Delivered"  # Đã giao
+    CANCELLED = "Cancelled"  # Đã hủy
 
 
 class OrderItemBase(BaseModel):

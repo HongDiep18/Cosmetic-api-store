@@ -27,6 +27,7 @@ from app.modules.orders.controller import (
     get_orders_ready_for_shipment,
     get_order_summaries,
     attach_payment_info,
+    get_top_customers,
 )
 
 
@@ -288,13 +289,12 @@ async def update_status_endpoint(
     Update an order's status.
 
     Valid status values:
-    - Pending
-    - Confirmed
-    - Processing
-    - Shipped
-    - Delivered
-    - Failed
-    - Cancelled
+    - Pending (Đã đặt)
+    - Confirmed (Đã xác nhận)
+    - Processing (Đang xử lý)
+    - Shipped (Đã giao cho vận chuyển)
+    - Delivered (Đã giao)
+    - Cancelled (Đã hủy)
 
     Request body example:
     {
@@ -407,4 +407,26 @@ async def get_order_summary_endpoint():
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error retrieving order summary: {str(e)}",
+        )
+
+
+# Lấy danh sách khách hàng thân thiết nhất
+@router.get("/top-customers")
+async def top_customers_endpoint(
+    limit: int = Query(10, description="Số lượng khách hàng cần lấy (mặc định: 10)"),
+):
+    """
+    Lấy danh sách khách hàng thân thiết nhất dựa trên:
+    - Tổng số đơn hàng đã giao
+    - Tổng số tiền đã chi tiêu
+    
+    Sắp xếp theo tổng số tiền chi tiêu giảm dần.
+    """
+    try:
+        customers = await get_top_customers(limit=limit)
+        return {"top_customers": customers}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error retrieving top customers: {str(e)}",
         )
