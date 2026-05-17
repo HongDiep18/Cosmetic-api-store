@@ -29,6 +29,7 @@ from app.modules.auth.controller import (
 from app.modules.users.schemas import UserOut, UserWithEmailOut
 from app.modules.auth.model import Account, Role
 from app.modules.users.model import User
+from app.modules.shippers.model import Shipper
 from bson import ObjectId
 
 router = APIRouter(tags=["Auth"])
@@ -127,15 +128,25 @@ async def refresh_token(_: RefreshTokenRequest):
 async def read_me(current_account: Account = Depends(get_current_account)):
     user = await User.find_one(User.AccountID == ObjectId(current_account.id))
 
-    if not user:
-        print(" Không tìm thấy user với AccountID:", current_account.id)
-        raise HTTPException(status_code=404, detail="User not found")
+    if user:
+        user_dict = user.to_dict() if hasattr(user, "to_dict") else user.model_dump()
+        user_dict["Email"] = current_account.Email
+        return UserWithEmailOut.model_validate(user_dict)
 
-    print("Tìm thấy user:", user.FullName)
-    user_dict = user.to_dict() if hasattr(user, "to_dict") else user.dict()
-    user_dict["Email"] = current_account.Email
+    shipper = await Shipper.find_one({"AccountID": current_account.id})
+    if shipper:
+        return UserWithEmailOut.model_validate({
+            "UserID": str(shipper.id),
+            "AccountID": shipper.AccountID,
+            "FullName": shipper.FullName,
+            "Phone": shipper.Phone,
+            "Address": None,
+            "Email": current_account.Email,
+            "CreatedAt": shipper.CreatedAt,
+            "UpdatedAt": shipper.UpdatedAt,
+        })
 
-    return UserWithEmailOut.model_validate(user_dict)
+    raise HTTPException(status_code=404, detail="User not found")
 
 
 @router.post("/logout")

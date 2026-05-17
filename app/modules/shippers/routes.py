@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 import traceback
 from app.modules.shippers.deps import require_shipper_account
+from app.modules.shippers.model import Shipper
 from app.modules.shippers.schemas import (
     ShipperCreate,
     ShipperOut,
@@ -244,6 +245,13 @@ async def update_delivery_status_endpoint(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error updating delivery status: {str(e)}",
         )
+
+
+@router.get("/me", response_model=ShipperOut)
+async def get_my_shipper_profile(
+    current_shipper: Shipper = Depends(require_shipper_account),
+):
+    return ShipperOut.model_validate(current_shipper, from_attributes=True)
 
 
 @router.get("/{shipper_id}", response_model=ShipperOut)
