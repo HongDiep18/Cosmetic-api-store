@@ -1,3 +1,4 @@
+node_modules/
 .venv
 __pycache__/
 *.pyc
@@ -13,9 +14,13 @@ articles
 politics
 result
 .env
+.env.me
 celerybeat-schedule
 fb_state.json
 supervisord.log
 apps/supervisord.log
 *.log
 public/uploads/
+.env*
+.flaskenv*
+!.env.project
