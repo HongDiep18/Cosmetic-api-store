@@ -4,7 +4,7 @@ A RESTful API for a cosmetic e-commerce platform built with **FastAPI**, **Mongo
 
 ---
 
-## Tech Stack
+## Tech Stack:
 
 ### Backend
 
