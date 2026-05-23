@@ -18,7 +18,7 @@ A RESTful API for a cosmetic e-commerce platform built with **FastAPI**, **Mongo
 | [python-multipart](https://github.com/Kludex/python-multipart)                    | 0.0.9   | File upload support (product images)       |
 | [email-validator](https://github.com/JoshData/python-email-validator)             | 2.2.0   | Email format validation                    |
 
-### Database
+### Database:
 
 | Library                                    | Version | Purpose                                        |
 | ------------------------------------------ | ------- | ---------------------------------------------- |
